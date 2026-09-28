@@ -1,5 +1,3 @@
-import fs from 'fs';
-import path from 'path';
 import {
   Merchant,
   HardwareDevice,
@@ -147,19 +145,6 @@ interface DatabaseSchema {
   sponsored_notifications: SponsoredNotification[];
 }
 
-const DATA_DIR = path.join(process.cwd(), '.data');
-const DB_FILE = path.join(DATA_DIR, 'db.json');
-
-function ensureDataDir() {
-  try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-  } catch {
-    // Edge runtime fallback
-  }
-}
-
 let inMemoryStore: DatabaseSchema = {
   merchants: [...INITIAL_MERCHANTS],
   hardware_devices: [...INITIAL_HARDWARE_DEVICES],
@@ -170,35 +155,12 @@ let inMemoryStore: DatabaseSchema = {
   sponsored_notifications: [...INITIAL_NOTIFICATIONS]
 };
 
-let isInitialized = false;
-
 function loadDatabase(): DatabaseSchema {
-  try {
-    ensureDataDir();
-    if (fs.existsSync(DB_FILE)) {
-      const data = fs.readFileSync(DB_FILE, 'utf-8');
-      inMemoryStore = JSON.parse(data);
-      isInitialized = true;
-      return inMemoryStore;
-    }
-  } catch {
-    // Edge or read error
-  }
-
-  if (!isInitialized) {
-    saveDatabase(inMemoryStore);
-    isInitialized = true;
-  }
   return inMemoryStore;
 }
 
 function saveDatabase(store: DatabaseSchema) {
-  try {
-    ensureDataDir();
-    fs.writeFileSync(DB_FILE, JSON.stringify(store, null, 2), 'utf-8');
-  } catch {
-    // Edge runtime fallback
-  }
+  inMemoryStore = store;
 }
 
 // -------------------------------------------------------------

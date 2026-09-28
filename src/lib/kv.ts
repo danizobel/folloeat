@@ -1,46 +1,6 @@
-import fs from 'fs';
-import path from 'path';
-
-interface KVStore {
-  [key: string]: {
-    value: string;
-    expiresAt?: number;
-  };
-}
-
-const DATA_DIR = path.join(process.cwd(), '.data');
-const KV_FILE = path.join(DATA_DIR, 'kv.json');
-
-function ensureDataDir() {
-  try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-  } catch {
-    // Ignore error in edge environments without direct fs access
-  }
-}
-
-function readLocalKV(): KVStore {
-  try {
-    ensureDataDir();
-    if (fs.existsSync(KV_FILE)) {
-      const raw = fs.readFileSync(KV_FILE, 'utf-8');
-      return JSON.parse(raw);
-    }
-  } catch {
-    // Fallback to empty store
-  }
-  return {};
-}
-
-function writeLocalKV(store: KVStore) {
-  try {
-    ensureDataDir();
-    fs.writeFileSync(KV_FILE, JSON.stringify(store, null, 2), 'utf-8');
-  } catch {
-    // Ignore in non-fs environments
-  }
+interface KVItem {
+  value: string;
+  expiresAt?: number;
 }
 
 export interface CloudflareKVNamespace {
@@ -49,48 +9,41 @@ export interface CloudflareKVNamespace {
   delete(key: string): Promise<void>;
 }
 
-class LocalKV implements CloudflareKVNamespace {
-  private memStore: KVStore = {};
+// In-memory fallback for local development or SSR environments
+const globalMemoryStore = new Map<string, KVItem>();
 
-  constructor() {
-    this.memStore = readLocalKV();
-  }
-
+class MemoryKV implements CloudflareKVNamespace {
   async get(key: string): Promise<string | null> {
-    this.memStore = readLocalKV();
-    const item = this.memStore[key];
+    const item = globalMemoryStore.get(key);
     if (!item) return null;
     if (item.expiresAt && Date.now() > item.expiresAt) {
-      delete this.memStore[key];
-      writeLocalKV(this.memStore);
+      globalMemoryStore.delete(key);
       return null;
     }
     return item.value;
   }
 
   async put(key: string, value: string, options?: { expirationTtl?: number }): Promise<void> {
-    this.memStore = readLocalKV();
     const expiresAt = options?.expirationTtl
       ? Date.now() + options.expirationTtl * 1000
       : undefined;
-    this.memStore[key] = { value, expiresAt };
-    writeLocalKV(this.memStore);
+    globalMemoryStore.set(key, { value, expiresAt });
   }
 
   async delete(key: string): Promise<void> {
-    this.memStore = readLocalKV();
-    delete this.memStore[key];
-    writeLocalKV(this.memStore);
+    globalMemoryStore.delete(key);
   }
 }
 
-// Singleton local KV instance
-const localKvInstance = new LocalKV();
+const memoryKvInstance = new MemoryKV();
 
 export function getKV(): CloudflareKVNamespace {
-  // Check if running inside Cloudflare runtime with binding CACHE_KV
+  // Check if running inside Cloudflare Workers/Pages with binding CACHE_KV
   if (typeof (globalThis as any).CACHE_KV !== 'undefined') {
     return (globalThis as any).CACHE_KV;
   }
-  return localKvInstance;
+  if (typeof (process.env as any).CACHE_KV !== 'undefined') {
+    return (process.env as any).CACHE_KV;
+  }
+  return memoryKvInstance;
 }
