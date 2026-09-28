@@ -52,6 +52,7 @@ export interface Merchant {
   delivery_time_est?: string;
   min_order?: number;
   distance_km?: number;
+  zone?: string;
 }
 
 export interface HardwareDevice {

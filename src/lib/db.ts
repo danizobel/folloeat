@@ -357,33 +357,64 @@ export function getDb(): D1Database {
 
 export async function getMerchants(zone?: string): Promise<Merchant[]> {
   await ensureDatabaseInitialized();
-  const d1 = getCloudflareD1();
-
-  if (d1) {
-    try {
-      const res = await d1.prepare("SELECT * FROM merchants").all<Merchant>();
-      let list = res.results || [];
-      if (zone && zone !== 'TUTTI') {
-        if (zone === 'Spiaggia') {
-          list = list.filter(m => (m.category?.toLowerCase().includes('mare') || m.address.toLowerCase().includes('italia') || m.is_partner === 1));
-        } else {
-          list = list.filter(m => (m.address.toLowerCase().includes(zone.toLowerCase()) || m.name.toLowerCase().includes(zone.toLowerCase())));
-        }
-      }
-      return list;
-    } catch {
-      // fallback to store
-    }
-  }
-
   const store = loadDatabase();
   let list = [...store.merchants];
 
   if (zone && zone !== 'TUTTI') {
-    if (zone === 'Spiaggia') {
-      list = list.filter(m => m.category?.toLowerCase().includes('mare') || m.address.toLowerCase().includes('italia') || m.is_partner === 1);
+    const z = zone.toLowerCase();
+    if (z === 'spiaggia') {
+      list = list.filter(m => 
+        m.category?.toLowerCase().includes('mare') || 
+        m.address.toLowerCase().includes('italia') || 
+        m.address.toLowerCase().includes('pratoranieri') ||
+        m.zone === 'Lungomare' ||
+        m.zone === 'Pratoranieri'
+      );
+    } else if (z === 'centro') {
+      list = list.filter(m =>
+        m.zone === 'Centro' ||
+        m.address.toLowerCase().includes('roma') ||
+        m.address.toLowerCase().includes('bicocchi') ||
+        m.address.toLowerCase().includes('fratti') ||
+        m.address.toLowerCase().includes('marconi') ||
+        m.address.toLowerCase().includes('sivieri') ||
+        m.address.toLowerCase().includes('guerrazzi') ||
+        m.address.toLowerCase().includes('centro')
+      );
+    } else if (z === 'lungomare') {
+      list = list.filter(m =>
+        m.zone === 'Lungomare' ||
+        m.address.toLowerCase().includes('italia') ||
+        m.address.toLowerCase().includes('litoranea') ||
+        m.address.toLowerCase().includes('carducci') ||
+        m.address.toLowerCase().includes('pineta')
+      );
+    } else if (z === 'senzuno') {
+      list = list.filter(m =>
+        m.zone === 'Senzuno' ||
+        m.address.toLowerCase().includes('senzuno') ||
+        m.address.toLowerCase().includes('repubblica') ||
+        m.address.toLowerCase().includes('gorizia')
+      );
+    } else if (z === 'pratoranieri') {
+      list = list.filter(m =>
+        m.zone === 'Pratoranieri' ||
+        m.address.toLowerCase().includes('pratoranieri') ||
+        (m.lat >= 42.928 && m.lng <= 10.740)
+      );
+    } else if (z === 'cassarello') {
+      list = list.filter(m =>
+        m.zone === 'Cassarello' ||
+        m.address.toLowerCase().includes('cassarello') ||
+        m.address.toLowerCase().includes('collacchie') ||
+        m.address.toLowerCase().includes('lago')
+      );
     } else {
-      list = list.filter(m => m.address.toLowerCase().includes(zone.toLowerCase()) || m.name.toLowerCase().includes(zone.toLowerCase()));
+      list = list.filter(m =>
+        (m.zone && m.zone.toLowerCase().includes(z)) ||
+        m.address.toLowerCase().includes(z) ||
+        m.name.toLowerCase().includes(z)
+      );
     }
   }
 

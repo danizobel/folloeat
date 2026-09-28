@@ -21,6 +21,7 @@ import {
   DietaryFilter,
   UserProfile
 } from '@/lib/types';
+import { isMerchantOpenNow } from '@/lib/opening-hours';
 import {
   Search,
   Map,
@@ -81,6 +82,18 @@ export default function HomePage() {
   const [places, setPlaces] = useState<Merchant[]>([]);
   const [notifications, setNotifications] = useState<SponsoredNotification[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Time & "Aperto Ora" Filter State
+  const [isOpenNowFilter, setIsOpenNowFilter] = useState(false);
+  const [currentTime, setCurrentTime] = useState(() => new Date());
+
+  // Periodically refresh current time every 30 seconds
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 30000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Selected Place & Menu Drawer
   const [selectedMerchant, setSelectedMerchant] = useState<Merchant | null>(null);
@@ -309,8 +322,19 @@ export default function HomePage() {
     setIsFastSeatingOpen(true);
   };
 
-  // Filtered places according to category, dietary options, and search
+  // Count of currently open venues
+  const openNowCount = React.useMemo(() => {
+    return places.filter(p => isMerchantOpenNow(p, currentTime).isOpen).length;
+  }, [places, currentTime]);
+
+  // Filtered places according to category, dietary options, open now status, and search
   const filteredPlaces = places.filter(place => {
+    // Open Now Filter
+    if (isOpenNowFilter) {
+      const openStatus = isMerchantOpenNow(place, currentTime);
+      if (!openStatus.isOpen) return false;
+    }
+
     // Dietary filter
     if (dietaryFilter === 'GLUTEN_FREE' && place.has_gluten_free !== 1) return false;
     if (dietaryFilter === 'VEGAN' && place.has_vegan !== 1) return false;
@@ -569,10 +593,32 @@ export default function HomePage() {
             ))}
           </div>
 
-          {/* Dietary Filters & View Switcher (Cards vs Interactive Map) */}
+          {/* Dietary Filters, "Aperto Ora" & View Switcher (Cards vs Interactive Map) */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-1">
-            {/* Dietary Tabs */}
+            {/* Filters Group */}
             <div className="flex flex-wrap items-center gap-2">
+              {/* "Aperto Ora" Live Filter Button */}
+              <button
+                onClick={() => setIsOpenNowFilter(!isOpenNowFilter)}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs ${
+                  isOpenNowFilter
+                    ? 'bg-emerald-600 text-white shadow-emerald-600/30 ring-2 ring-emerald-400/40'
+                    : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
+                }`}
+                title={isOpenNowFilter ? "Disattiva filtro per mostrare tutti i ristoranti" : "Filtra per mostrare solo i ristoranti attualmente aperti"}
+              >
+                <span className={`w-2 h-2 rounded-full ${isOpenNowFilter ? 'bg-white animate-pulse' : 'bg-emerald-500'}`} />
+                <span>Aperto ora</span>
+                <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${
+                  isOpenNowFilter ? 'bg-white/20 text-white' : 'bg-emerald-50 text-emerald-800'
+                }`}>
+                  {openNowCount}
+                </span>
+              </button>
+
+              <div className="h-5 w-[1px] bg-slate-200 hidden sm:block"></div>
+
+              {/* Dietary Tabs */}
               <button
                 onClick={() => setDietaryFilter('ALL')}
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
@@ -734,6 +780,22 @@ export default function HomePage() {
                           <MapPin className="w-3.5 h-3.5 text-follo-red shrink-0" />
                           {place.address}
                         </p>
+
+                        {/* Live Operational Hours Badge */}
+                        {(() => {
+                          const openStatus = isMerchantOpenNow(place, currentTime);
+                          return (
+                            <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                              <span className={`px-2 py-0.5 rounded-md text-[10px] font-black border flex items-center gap-1 ${openStatus.badgeClass}`}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${openStatus.badgeDotClass}`} />
+                                <span>{openStatus.statusLabel}</span>
+                              </span>
+                              <span className="text-[10px] text-slate-500 font-medium">
+                                {openStatus.nextTransition}
+                              </span>
+                            </div>
+                          );
+                        })()}
 
                         {/* Dietary Option Tags */}
                         {isAccredited && (

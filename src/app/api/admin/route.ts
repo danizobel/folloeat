@@ -65,7 +65,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Total SaaS recurring revenue (€29 * partner merchants)
-    const activePartners = merchants.filter(m => m.is_partner === 1);
+    const activePartners = merchants.filter(m => m.is_partner === 1 || m.is_accredited === 1);
     const totalSaaSMoney = activePartners.length * 29.00;
 
     // Total FolloEat Platform Gross Margin
@@ -195,7 +195,8 @@ export async function GET(req: NextRequest) {
       merchants: merchants,
       hardware_devices: hardware,
       merchant_statements: merchantStatements,
-      notifications: notifications
+      notifications: notifications,
+      orders: orders
     });
   } catch (error) {
     return NextResponse.json(

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   X,
   Trash2,
@@ -13,9 +13,18 @@ import {
   Sparkles,
   CheckCircle2,
   Leaf,
-  FileText
+  FileText,
+  MapPin,
+  Navigation,
+  Check
 } from 'lucide-react';
 import { OrderItem, Order } from '@/lib/types';
+import {
+  validateFollonicaAddress,
+  FOLLONICA_STREETS,
+  FOLLONICA_BEACH_POINTS,
+  AddressValidationResult
+} from '@/lib/address-validation';
 
 interface CartCheckoutModalProps {
   isOpen: boolean;
@@ -45,6 +54,7 @@ export default function CartCheckoutModal({
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [showAddressSuggestions, setShowAddressSuggestions] = useState(false);
   const [notes, setNotes] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'CARD' | 'CASH'>('CARD');
   const [cashChangeFrom, setCashChangeFrom] = useState('');
@@ -56,6 +66,42 @@ export default function CartCheckoutModal({
   // 18+ Alcohol Modal state
   const [ageConfirmed18, setAgeConfirmed18] = useState(false);
   const [showAgeWarningModal, setShowAgeWarningModal] = useState(false);
+
+  // Address validation memo
+  const addressValidation: AddressValidationResult | null = useMemo(() => {
+    if (pickupPoint) {
+      return {
+        isValid: true,
+        isInFollonica: true,
+        hasHouseNumber: true,
+        streetName: pickupPoint,
+        zone: (zone as any) || 'Lungomare',
+        normalizedAddress: `Spiaggia - ${pickupPoint}, Follonica`,
+        isBeachPoint: true,
+        beachPointName: pickupPoint,
+        confidence: 'HIGH' as const
+      };
+    }
+    if (!deliveryAddress.trim()) return null;
+    return validateFollonicaAddress(deliveryAddress, zone);
+  }, [deliveryAddress, pickupPoint, zone]);
+
+  // Street autocomplete suggestions
+  const streetSuggestions = useMemo(() => {
+    const q = deliveryAddress.trim().toLowerCase();
+    if (!q || q.length < 2) return [];
+
+    const matches = FOLLONICA_STREETS.filter(s =>
+      s.name.toLowerCase().includes(q) ||
+      s.name.toLowerCase().replace(/^(via|viale|piazza)\s+/i, '').includes(q)
+    ).slice(0, 5);
+
+    const beachMatches = FOLLONICA_BEACH_POINTS.filter(b =>
+      b.name.toLowerCase().includes(q)
+    ).slice(0, 3);
+
+    return [...matches, ...beachMatches];
+  }, [deliveryAddress]);
 
   // Submission loading & errors
   const [isLoading, setIsLoading] = useState(false);
@@ -94,6 +140,19 @@ export default function CartCheckoutModal({
     if (items.length === 0) {
       setErrorMessage('Il carrello è vuoto.');
       return;
+    }
+
+    // Address validation check for home delivery
+    if (!pickupPoint) {
+      if (!deliveryAddress.trim()) {
+        setErrorMessage('L\'indirizzo di consegna a Follonica è obbligatorio per la consegna a domicilio.');
+        return;
+      }
+      const addrCheck = validateFollonicaAddress(deliveryAddress, zone);
+      if (!addrCheck.isValid || !addrCheck.isInFollonica) {
+        setErrorMessage(addrCheck.error || 'Indirizzo non valido o fuori dalla copertura del comune di Follonica (58022).');
+        return;
+      }
     }
 
     if (hasAlcohol && !ageConfirmed18) {
@@ -310,17 +369,152 @@ export default function CartCheckoutModal({
                 </div>
               </div>
 
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                  Indirizzo di Consegna o Punto Spiaggia
-                </label>
-                <input
-                  type="text"
-                  placeholder={pickupPoint ? `Punto: ${pickupPoint}` : "Via, Numero civico, Scala, Piano..."}
-                  value={deliveryAddress}
-                  onChange={(e) => setDeliveryAddress(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-follo-blue"
-                />
+              <div className="relative">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-[11px] font-bold text-slate-700 flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5 text-follo-red" />
+                    <span>{pickupPoint ? 'Punto Spiaggia / Ombrellone' : 'Indirizzo di Consegna (Follonica 58022) *'}</span>
+                  </label>
+                  {addressValidation && (
+                    <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md flex items-center gap-1 ${
+                      addressValidation.isValid && (addressValidation.hasHouseNumber || addressValidation.isBeachPoint)
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : addressValidation.isValid
+                        ? 'bg-amber-100 text-amber-800'
+                        : 'bg-rose-100 text-rose-800'
+                    }`}>
+                      {addressValidation.isValid && (addressValidation.hasHouseNumber || addressValidation.isBeachPoint) ? (
+                        <>
+                          <Check className="w-3 h-3 text-emerald-600" />
+                          <span>Convalidato ({addressValidation.zone})</span>
+                        </>
+                      ) : addressValidation.isValid ? (
+                        <>
+                          <AlertCircle className="w-3 h-3 text-amber-600" />
+                          <span>Manca Civico</span>
+                        </>
+                      ) : (
+                        <>
+                          <X className="w-3 h-3 text-rose-600" />
+                          <span>Non Valido</span>
+                        </>
+                      )}
+                    </span>
+                  )}
+                </div>
+
+                <div className="relative">
+                  <input
+                    type="text"
+                    required={!pickupPoint}
+                    placeholder={pickupPoint ? `Punto: ${pickupPoint}` : "Es. Via Roma 15, Viale Italia 80..."}
+                    value={deliveryAddress}
+                    onFocus={() => setShowAddressSuggestions(true)}
+                    onChange={(e) => {
+                      setDeliveryAddress(e.target.value);
+                      setShowAddressSuggestions(true);
+                    }}
+                    className={`w-full px-3.5 py-2.5 rounded-xl border text-xs focus:outline-none focus:ring-2 font-medium ${
+                      addressValidation && !addressValidation.isValid
+                        ? 'border-rose-300 focus:ring-rose-400 bg-rose-50/20'
+                        : addressValidation?.isValid && (addressValidation.hasHouseNumber || addressValidation.isBeachPoint)
+                        ? 'border-emerald-300 focus:ring-emerald-400 bg-emerald-50/20'
+                        : 'border-slate-200 focus:ring-follo-blue'
+                    }`}
+                  />
+                  {deliveryAddress && (
+                    <button
+                      type="button"
+                      onClick={() => setDeliveryAddress('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Autocomplete Suggestions Dropdown */}
+                {showAddressSuggestions && streetSuggestions.length > 0 && (
+                  <div className="absolute left-0 right-0 top-full mt-1 bg-white rounded-2xl shadow-xl border border-slate-200 z-50 overflow-hidden divide-y divide-slate-100">
+                    <div className="px-3 py-1.5 bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+                      <span>Suggerimenti Vie Follonica</span>
+                      <button
+                        type="button"
+                        onClick={() => setShowAddressSuggestions(false)}
+                        className="text-slate-400 hover:text-slate-600 text-[10px]"
+                      >
+                        Chiudi
+                      </button>
+                    </div>
+                    {streetSuggestions.map((s, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => {
+                          setDeliveryAddress(`${s.name} `);
+                          setShowAddressSuggestions(false);
+                        }}
+                        className="w-full text-left px-3.5 py-2 hover:bg-sky-50 flex items-center justify-between transition-colors text-xs"
+                      >
+                        <div className="flex items-center gap-2">
+                          <MapPin className="w-3.5 h-3.5 text-follo-blue shrink-0" />
+                          <span className="font-bold text-slate-800">{s.name}</span>
+                        </div>
+                        <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">
+                          {s.zone}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Validation Feedback Banner */}
+                {addressValidation && (
+                  <div className="mt-2">
+                    {addressValidation.isValid ? (
+                      addressValidation.hasHouseNumber || addressValidation.isBeachPoint ? (
+                        <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] flex items-center gap-2">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <div className="flex-1">
+                            <span className="font-bold">Indirizzo Verificato a Follonica:</span> {addressValidation.normalizedAddress}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-[11px] flex items-center gap-2">
+                          <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                          <div>
+                            <span className="font-bold">Via {addressValidation.streetName} ({addressValidation.zone}):</span> Inserisci il numero civico (es. 15) per consentire al rider di raggiungere esattamente il portone.
+                          </div>
+                        </div>
+                      )
+                    ) : (
+                      <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-[11px] flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                        <div>{addressValidation.error}</div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Quick Street Chips */}
+                {!deliveryAddress && !pickupPoint && (
+                  <div className="mt-2 flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+                    <span className="text-[10px] text-slate-400 font-bold uppercase shrink-0">Vie Principali:</span>
+                    {['Via Roma', 'Viale Italia', 'Via Bicocchi', 'Via Cassarello', 'Via della Repubblica', 'Via Litoranea'].map((st) => (
+                      <button
+                        key={st}
+                        type="button"
+                        onClick={() => {
+                          setDeliveryAddress(`${st} `);
+                          setShowAddressSuggestions(false);
+                        }}
+                        className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-sky-100 hover:text-follo-blue text-slate-700 text-[10px] font-bold transition-colors whitespace-nowrap shrink-0 border border-slate-200"
+                      >
+                        {st}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div>

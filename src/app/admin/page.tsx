@@ -33,7 +33,9 @@ import {
   Check,
   LogOut
 } from 'lucide-react';
-import { HardwareDevice, DepositStatus, SponsoredNotification, Merchant } from '@/lib/types';
+import { HardwareDevice, DepositStatus, SponsoredNotification, Merchant, Order } from '@/lib/types';
+import { validateFollonicaAddress } from '@/lib/address-validation';
+import AdminDailyTransactionsChart from '@/components/AdminDailyTransactionsChart';
 
 interface AdminKPIs {
   total_transacted: number;
@@ -76,6 +78,7 @@ export default function SuperAdminPage() {
   const [hardware, setHardware] = useState<HardwareDevice[]>([]);
   const [statements, setStatements] = useState<MerchantStatement[]>([]);
   const [notifications, setNotifications] = useState<SponsoredNotification[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -163,6 +166,7 @@ export default function SuperAdminPage() {
         setHardware(data.hardware_devices || []);
         setStatements(data.merchant_statements || []);
         setNotifications(data.notifications || []);
+        setOrders(data.orders || []);
       }
     } catch (err) {
       console.error('Error fetching admin data:', err);
@@ -631,6 +635,13 @@ export default function SuperAdminPage() {
       {/* Main Content Sections */}
       <div className="max-w-7xl mx-auto mt-8 space-y-8">
         
+        {/* D3 Interactive Daily Transactions Chart */}
+        <AdminDailyTransactionsChart
+          orders={orders}
+          merchants={merchants}
+          isLoading={isLoading}
+        />
+
         {/* Table 1: Anagrafica Locali & Gestione Onboarding Follonica (3 Livelli) */}
         <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -1131,7 +1142,23 @@ export default function SuperAdminPage() {
               </div>
 
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Indirizzo a Follonica</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="font-bold text-slate-700">Indirizzo a Follonica</label>
+                  {merchantForm.address.trim() && (() => {
+                    const check = validateFollonicaAddress(merchantForm.address);
+                    return check.isValid ? (
+                      <span className="text-[10px] font-black text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md flex items-center gap-1">
+                        <Check className="w-3 h-3 text-emerald-600" />
+                        <span>{check.zone} ({check.coordinates?.lat.toFixed(4)}, {check.coordinates?.lng.toFixed(4)})</span>
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-black text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-md flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3 text-rose-600" />
+                        <span>Fuori Follonica</span>
+                      </span>
+                    );
+                  })()}
+                </div>
                 <input
                   type="text"
                   required

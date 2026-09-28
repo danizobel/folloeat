@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { createOrder, getOrders } from '@/lib/db';
 import { OrderItem } from '@/lib/types';
+import { validateFollonicaAddress } from '@/lib/address-validation';
 
 export async function GET(req: NextRequest) {
   try {
@@ -44,6 +45,23 @@ export async function POST(req: NextRequest) {
     }
     if (!items || !Array.isArray(items) || items.length === 0) {
       return NextResponse.json({ success: false, error: 'Il carrello è vuoto.' }, { status: 400 });
+    }
+
+    // Address validation for home delivery
+    if (!pickup_point) {
+      if (!delivery_address || typeof delivery_address !== 'string' || !delivery_address.trim()) {
+        return NextResponse.json({
+          success: false,
+          error: 'L\'indirizzo di consegna a Follonica è obbligatorio per gli ordini a domicilio.'
+        }, { status: 400 });
+      }
+      const addrCheck = validateFollonicaAddress(delivery_address, zone);
+      if (!addrCheck.isValid || !addrCheck.isInFollonica) {
+        return NextResponse.json({
+          success: false,
+          error: addrCheck.error || 'Indirizzo non valido o fuori dalla copertura del comune di Follonica (CAP 58022).'
+        }, { status: 400 });
+      }
     }
 
     // Cash payment validation
