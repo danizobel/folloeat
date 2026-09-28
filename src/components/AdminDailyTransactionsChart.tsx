@@ -18,20 +18,26 @@ import {
   Sparkles,
   ArrowUpRight,
   Layers,
-  Store
+  Store,
+  CheckCircle2,
+  Trophy,
+  PlusCircle,
+  Percent,
+  Receipt
 } from 'lucide-react';
 
 interface AdminDailyTransactionsChartProps {
   orders: Order[];
   merchants: Merchant[];
   isLoading?: boolean;
+  onSimulateOrder?: (newOrder: Order) => void;
 }
 
 export type TimeRange = 7 | 14 | 30;
 export type ChartMetric = 'volume' | 'orders' | 'commissions';
 export type BreakdownMode = 'total' | 'payment_method';
 
-interface DayBucket {
+export interface DayBucket {
   date: Date;
   dateKey: string;     // YYYY-MM-DD
   displayDate: string; // e.g. "27 Set"
@@ -51,7 +57,7 @@ interface DayBucket {
   orders: Order[];
 }
 
-interface PeriodStats {
+export interface PeriodStats {
   totalVol: number;
   cardVol: number;
   cashVol: number;
@@ -60,13 +66,23 @@ interface PeriodStats {
   avgTicketOverall: number;
   cardPct: number;
   commissionsTotal: number;
+  growthPct: number;
   peakDay: DayBucket | null;
+}
+
+interface TopMerchantRank {
+  id: string;
+  name: string;
+  volume: number;
+  ordersCount: number;
+  percentOfTotal: number;
 }
 
 export default function AdminDailyTransactionsChart({
   orders,
   merchants,
-  isLoading = false
+  isLoading = false,
+  onSimulateOrder
 }: AdminDailyTransactionsChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -77,16 +93,36 @@ export default function AdminDailyTransactionsChart({
   const [breakdownMode, setBreakdownMode] = useState<BreakdownMode>('total');
   const [selectedMerchantId, setSelectedMerchantId] = useState<string>('ALL');
 
+  // Window resize responsive redraw trigger
+  const [viewportWidth, setViewportWidth] = useState<number>(800);
+
   // Interactive selected bar state
   const [hoveredDay, setHoveredDay] = useState<DayBucket | null>(null);
   const [selectedDay, setSelectedDay] = useState<DayBucket | null>(null);
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
 
+  // Quick order simulator modal
+  const [isSimulatorOpen, setIsSimulatorOpen] = useState(false);
+  const [simMerchantId, setSimMerchantId] = useState<string>(merchants[0]?.id || 'm_michele_01');
+  const [simAmount, setSimAmount] = useState<string>('32.50');
+  const [simPaymentMethod, setSimPaymentMethod] = useState<'CARD' | 'CASH'>('CARD');
+
+  // Observe container size
+  useEffect(() => {
+    function handleResize() {
+      if (containerRef.current) {
+        setViewportWidth(containerRef.current.clientWidth);
+      }
+    }
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   // Compute daily aggregated data based on timeRange and selectedMerchantId
   const dailyData: DayBucket[] = useMemo(() => {
     const buckets: DayBucket[] = [];
     const now = new Date();
-    // Normalize today to start of day in local time
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
     // Generate days for the selected range (oldest to newest)
@@ -103,8 +139,6 @@ export default function AdminDailyTransactionsChart({
       const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
       const isToday = i === 0;
 
-      // Short format in Italian
-      const dayNames = ['Dom', 'Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab'];
       const monthNames = ['Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu', 'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic'];
       const monthFull = [
         'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
@@ -154,7 +188,6 @@ export default function AdminDailyTransactionsChart({
         merchantSums[mId].amount += val;
       }
 
-      // Identify top merchant of the day
       let topMerchantName = 'Nessun ordine';
       let topMerchantAmount = 0;
       for (const item of Object.values(merchantSums)) {
@@ -212,11 +245,19 @@ export default function AdminDailyTransactionsChart({
       }
     }
 
-    const activeDaysCount = dailyData.filter(d => d.totalVolume > 0).length || 1;
     const dailyAvg = dailyData.length > 0 ? totalVol / dailyData.length : 0;
     const avgTicketOverall = totalOrders > 0 ? totalVol / totalOrders : 0;
     const cardPct = totalVol > 0 ? (cardVol / totalVol) * 100 : 0;
     const commissionsTotal = Number((totalVol * 0.08).toFixed(2));
+
+    // Comparative Growth: Compare first half of range with second half
+    const half = Math.floor(dailyData.length / 2);
+    const firstHalfVol = dailyData.slice(0, half).reduce((sum, d) => sum + d.totalVolume, 0);
+    const secondHalfVol = dailyData.slice(half).reduce((sum, d) => sum + d.totalVolume, 0);
+    let growthPct = 0;
+    if (firstHalfVol > 0) {
+      growthPct = Number((((secondHalfVol - firstHalfVol) / firstHalfVol) * 100).toFixed(1));
+    }
 
     return {
       totalVol: Number(totalVol.toFixed(2)),
@@ -227,20 +268,48 @@ export default function AdminDailyTransactionsChart({
       avgTicketOverall: Number(avgTicketOverall.toFixed(2)),
       cardPct: Number(cardPct.toFixed(1)),
       commissionsTotal,
+      growthPct,
       peakDay
     };
   }, [dailyData]);
+
+  // Top 3 Merchants Leaderboard in the active period
+  const topMerchants: TopMerchantRank[] = useMemo(() => {
+    const merchantMap: Record<string, { id: string; name: string; volume: number; ordersCount: number }> = {};
+
+    dailyData.forEach(d => {
+      d.orders.forEach(o => {
+        const mId = o.merchant_id;
+        const mName = o.merchant_name || 'Ristorante';
+        if (!merchantMap[mId]) {
+          merchantMap[mId] = { id: mId, name: mName, volume: 0, ordersCount: 0 };
+        }
+        merchantMap[mId].volume += o.total_order_amount;
+        merchantMap[mId].ordersCount++;
+      });
+    });
+
+    const totalPeriodVol = periodStats.totalVol || 1;
+    return Object.values(merchantMap)
+      .sort((a, b) => b.volume - a.volume)
+      .slice(0, 3)
+      .map(m => ({
+        ...m,
+        volume: Number(m.volume.toFixed(2)),
+        percentOfTotal: Number(((m.volume / totalPeriodVol) * 100).toFixed(1))
+      }));
+  }, [dailyData, periodStats.totalVol]);
 
   // D3 Chart Rendering
   useEffect(() => {
     if (!svgRef.current || !containerRef.current) return;
 
     const svg = d3.select(svgRef.current);
-    svg.selectAll('*').remove(); // Clean slate on render
+    svg.selectAll('*').remove();
 
     const containerWidth = containerRef.current.clientWidth || 800;
-    const height = 340;
-    const margin = { top: 32, right: 28, bottom: 44, left: 62 };
+    const height = 350;
+    const margin = { top: 38, right: 30, bottom: 46, left: 65 };
     const innerWidth = containerWidth - margin.left - margin.right;
     const innerHeight = height - margin.top - margin.bottom;
 
@@ -252,10 +321,22 @@ export default function AdminDailyTransactionsChart({
       .attr('height', height)
       .style('overflow', 'visible');
 
-    // Defs for gradients & shadow filters
+    // Defs for gradients & drop shadow filters
     const defs = svg.append('defs');
 
-    // Volume Gradient (FolloEat Sky Blue)
+    // Drop shadow filter for active bars
+    const shadowFilter = defs.append('filter')
+      .attr('id', 'd3-bar-shadow')
+      .attr('x', '-10%').attr('y', '-10%')
+      .attr('width', '120%').attr('height', '130%');
+    shadowFilter.append('feDropShadow')
+      .attr('dx', '0')
+      .attr('dy', '3')
+      .attr('stdDeviation', '3')
+      .attr('flood-color', '#0284c7')
+      .attr('flood-opacity', '0.25');
+
+    // Linear Gradients
     const gradVolume = defs.append('linearGradient')
       .attr('id', 'grad-volume')
       .attr('x1', '0%').attr('y1', '0%')
@@ -263,7 +344,6 @@ export default function AdminDailyTransactionsChart({
     gradVolume.append('stop').attr('offset', '0%').attr('stop-color', '#0284c7');
     gradVolume.append('stop').attr('offset', '100%').attr('stop-color', '#38bdf8');
 
-    // Card Gradient (Stripe Indigo)
     const gradCard = defs.append('linearGradient')
       .attr('id', 'grad-card')
       .attr('x1', '0%').attr('y1', '0%')
@@ -271,7 +351,6 @@ export default function AdminDailyTransactionsChart({
     gradCard.append('stop').attr('offset', '0%').attr('stop-color', '#4f46e5');
     gradCard.append('stop').attr('offset', '100%').attr('stop-color', '#818cf8');
 
-    // Cash Gradient (Amber Orange)
     const gradCash = defs.append('linearGradient')
       .attr('id', 'grad-cash')
       .attr('x1', '0%').attr('y1', '0%')
@@ -279,7 +358,6 @@ export default function AdminDailyTransactionsChart({
     gradCash.append('stop').attr('offset', '0%').attr('stop-color', '#d97706');
     gradCash.append('stop').attr('offset', '100%').attr('stop-color', '#fbbf24');
 
-    // Commission Gradient (Emerald Green)
     const gradComm = defs.append('linearGradient')
       .attr('id', 'grad-comm')
       .attr('x1', '0%').attr('y1', '0%')
@@ -287,11 +365,11 @@ export default function AdminDailyTransactionsChart({
     gradComm.append('stop').attr('offset', '0%').attr('stop-color', '#059669');
     gradComm.append('stop').attr('offset', '100%').attr('stop-color', '#34d399');
 
-    // Main Chart Group
+    // Main Chart Canvas Group
     const g = svg.append('g')
       .attr('transform', `translate(${margin.left},${margin.top})`);
 
-    // X Scale
+    // X Scale Band
     const xScale = d3.scaleBand()
       .domain(dailyData.map(d => d.dateKey))
       .range([0, innerWidth])
@@ -301,13 +379,13 @@ export default function AdminDailyTransactionsChart({
     let maxY = 100;
     if (metric === 'volume') {
       const maxVal = d3.max(dailyData, d => d.totalVolume) || 0;
-      maxY = Math.max(maxVal * 1.18, 50);
+      maxY = Math.max(maxVal * 1.20, 50);
     } else if (metric === 'orders') {
       const maxVal = d3.max(dailyData, d => d.orderCount) || 0;
       maxY = Math.max(maxVal + 2, 6);
     } else {
       const maxVal = d3.max(dailyData, d => d.commission) || 0;
-      maxY = Math.max(maxVal * 1.18, 10);
+      maxY = Math.max(maxVal * 1.20, 10);
     }
 
     const yScale = d3.scaleLinear()
@@ -315,7 +393,7 @@ export default function AdminDailyTransactionsChart({
       .nice()
       .range([innerHeight, 0]);
 
-    // 1. Weekend background stripes to visualize weekly rhythm (Follonica peak on weekends)
+    // 1. Weekend background stripes
     g.selectAll('.weekend-band')
       .data(dailyData.filter(d => d.isWeekend))
       .enter()
@@ -343,7 +421,7 @@ export default function AdminDailyTransactionsChart({
       .attr('stroke-width', 1)
       .attr('stroke-dasharray', '3,3');
 
-    // 3. Average Reference Line (for volume or orders)
+    // 3. Average Benchmark Reference Line
     let avgValue = 0;
     if (metric === 'volume') avgValue = periodStats.dailyAvg;
     else if (metric === 'orders') avgValue = periodStats.totalOrders / (dailyData.length || 1);
@@ -362,14 +440,24 @@ export default function AdminDailyTransactionsChart({
         .attr('stroke-width', 1.5)
         .attr('stroke-dasharray', '4,4');
 
+      // Tag badge at the end of the average line
+      avgGroup.append('rect')
+        .attr('x', innerWidth - 85)
+        .attr('y', avgY - 18)
+        .attr('width', 82)
+        .attr('height', 16)
+        .attr('rx', 4)
+        .attr('fill', '#f1f5f9')
+        .attr('stroke', '#cbd5e1');
+
       avgGroup.append('text')
-        .attr('x', innerWidth - 6)
-        .attr('y', avgY - 5)
-        .attr('text-anchor', 'end')
-        .attr('fill', '#64748b')
-        .attr('font-size', '10px')
+        .attr('x', innerWidth - 44)
+        .attr('y', avgY - 6)
+        .attr('text-anchor', 'middle')
+        .attr('fill', '#475569')
+        .attr('font-size', '9px')
         .attr('font-weight', '700')
-        .text(`Media: ${metric === 'orders' ? avgValue.toFixed(1) : `€${avgValue.toFixed(1)}`}`);
+        .text(`Media: ${metric === 'orders' ? avgValue.toFixed(1) : `€${avgValue.toFixed(0)}`}`);
     }
 
     // 4. Render Bars
@@ -415,6 +503,18 @@ export default function AdminDailyTransactionsChart({
         .attr('y', d => yScale(d.totalVolume))
         .attr('height', d => Math.max(0, yScale(d.cardVolume) - yScale(d.totalVolume)));
 
+      // Selection Ring for Active Day
+      barGroup.filter(d => selectedDay?.dateKey === d.dateKey)
+        .append('rect')
+        .attr('x', -3)
+        .attr('y', d => yScale(d.totalVolume) - 3)
+        .attr('width', barWidth + 6)
+        .attr('height', d => Math.max(0, innerHeight - yScale(d.totalVolume) + 3))
+        .attr('fill', 'none')
+        .attr('stroke', '#0284c7')
+        .attr('stroke-width', 2)
+        .attr('rx', 5);
+
       // Top Value Label on Stacked Bar
       barGroup.append('text')
         .attr('x', barWidth / 2)
@@ -437,7 +537,7 @@ export default function AdminDailyTransactionsChart({
           const [mx, my] = d3.pointer(event, containerRef.current);
           setTooltipPos({ x: mx, y: my });
 
-          barGroup.transition().duration(150).style('opacity', item => (item.dateKey === d.dateKey ? 1 : 0.4));
+          barGroup.transition().duration(150).style('opacity', item => (item.dateKey === d.dateKey ? 1 : 0.35));
         })
         .on('mousemove', (event) => {
           const [mx, my] = d3.pointer(event, containerRef.current);
@@ -458,10 +558,15 @@ export default function AdminDailyTransactionsChart({
       if (metric === 'commissions') fillUrl = 'url(#grad-comm)';
       else if (metric === 'orders') fillUrl = '#0284c7';
 
-      const bars = g.selectAll('.single-bar')
+      const barGroup = g.selectAll('.single-bar-group')
         .data(dailyData)
         .enter()
-        .append('rect')
+        .append('g')
+        .attr('class', 'single-bar-group')
+        .style('cursor', 'pointer');
+
+      // The Bar
+      const bars = barGroup.append('rect')
         .attr('class', 'single-bar')
         .attr('x', d => xScale(d.dateKey) || 0)
         .attr('width', xScale.bandwidth())
@@ -469,14 +574,32 @@ export default function AdminDailyTransactionsChart({
         .attr('height', 0)
         .attr('fill', d => {
           if (selectedDay?.dateKey === d.dateKey) return '#0f172a';
-          if (d.isToday) return '#2563eb';
+          if (d.isToday) return '#0284c7';
           return fillUrl;
         })
         .attr('rx', 4)
         .attr('ry', 4)
-        .style('cursor', 'pointer');
+        .attr('filter', 'url(#d3-bar-shadow)');
 
-      // Animated Entrance
+      // Selection Ring for Active Day
+      barGroup.filter(d => selectedDay?.dateKey === d.dateKey)
+        .append('rect')
+        .attr('x', d => (xScale(d.dateKey) || 0) - 3)
+        .attr('y', d => {
+          const val = metric === 'volume' ? d.totalVolume : metric === 'orders' ? d.orderCount : d.commission;
+          return yScale(val) - 3;
+        })
+        .attr('width', xScale.bandwidth() + 6)
+        .attr('height', d => {
+          const val = metric === 'volume' ? d.totalVolume : metric === 'orders' ? d.orderCount : d.commission;
+          return Math.max(0, innerHeight - yScale(val) + 3);
+        })
+        .attr('fill', 'none')
+        .attr('stroke', '#0284c7')
+        .attr('stroke-width', 2)
+        .attr('rx', 5);
+
+      // Entrance animation
       bars.transition()
         .duration(600)
         .delay((_, idx) => idx * 18)
@@ -492,10 +615,7 @@ export default function AdminDailyTransactionsChart({
 
       // Bar Top Labels
       if (timeRange <= 14) {
-        g.selectAll('.bar-label')
-          .data(dailyData)
-          .enter()
-          .append('text')
+        barGroup.append('text')
           .attr('class', 'bar-label')
           .attr('x', d => (xScale(d.dateKey) || 0) + xScale.bandwidth() / 2)
           .attr('y', d => {
@@ -519,13 +639,13 @@ export default function AdminDailyTransactionsChart({
       }
 
       // Interactive Events on Unified Bars
-      bars
+      barGroup
         .on('mouseenter', (event, d) => {
           setHoveredDay(d);
           const [mx, my] = d3.pointer(event, containerRef.current);
           setTooltipPos({ x: mx, y: my });
 
-          bars.transition().duration(150).style('opacity', item => (item.dateKey === d.dateKey ? 1 : 0.35));
+          barGroup.transition().duration(150).style('opacity', item => (item.dateKey === d.dateKey ? 1 : 0.35));
         })
         .on('mousemove', (event) => {
           const [mx, my] = d3.pointer(event, containerRef.current);
@@ -534,7 +654,7 @@ export default function AdminDailyTransactionsChart({
         .on('mouseleave', () => {
           setHoveredDay(null);
           setTooltipPos(null);
-          bars.transition().duration(200).style('opacity', 1);
+          barGroup.transition().duration(200).style('opacity', 1);
         })
         .on('click', (_, d) => {
           setSelectedDay(prev => (prev?.dateKey === d.dateKey ? null : d));
@@ -576,7 +696,7 @@ export default function AdminDailyTransactionsChart({
       .attr('class', 'y-axis')
       .call(yAxis);
 
-    yAxisGroup.select('.domain').remove(); // Clean modern chart look (no vertical left axis line)
+    yAxisGroup.select('.domain').remove();
     yAxisGroup.selectAll('.tick line').remove();
     yAxisGroup.selectAll('.tick text')
       .attr('fill', '#64748b')
@@ -584,7 +704,43 @@ export default function AdminDailyTransactionsChart({
       .attr('font-weight', '600')
       .attr('dx', '-4px');
 
-  }, [dailyData, metric, breakdownMode, timeRange, periodStats, selectedDay]);
+  }, [dailyData, metric, breakdownMode, timeRange, periodStats, selectedDay, viewportWidth]);
+
+  // Handler for simulating order injection
+  const handleSimulateSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const targetMerchant = merchants.find(m => m.id === simMerchantId) || merchants[0];
+    const amountNum = parseFloat(simAmount) || 28.50;
+
+    const fakeOrder: Order = {
+      id: `ORD-TEST-${Math.floor(1000 + Math.random() * 9000)}`,
+      merchant_id: targetMerchant.id,
+      merchant_name: targetMerchant.name,
+      customer_name: 'Cliente Test Follonica',
+      customer_phone: '+39 347 5802200',
+      delivery_pin: '5802',
+      delivery_address: 'Via Roma 10, 58022 Follonica (GR)',
+      zone: 'Centro',
+      total_food_amount: Number((amountNum - 0.15).toFixed(2)),
+      platform_fee: 0.15,
+      total_order_amount: amountNum,
+      payment_method: simPaymentMethod,
+      stripe_payment_intent_id: simPaymentMethod === 'CARD' ? `pi_test_${Date.now()}` : undefined,
+      capture_status: 'CAPTURED',
+      status: 'COMPLETED',
+      cutlery_requested: 0,
+      items_json: JSON.stringify([
+        { name: 'Ordine Test SuperAdmin', price: amountNum - 0.15, quantity: 1 }
+      ]),
+      follo_points_earned: Math.floor(amountNum),
+      created_at: new Date().toISOString()
+    };
+
+    if (onSimulateOrder) {
+      onSimulateOrder(fakeOrder);
+    }
+    setIsSimulatorOpen(false);
+  };
 
   return (
     <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs space-y-6">
@@ -592,17 +748,22 @@ export default function AdminDailyTransactionsChart({
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-slate-100">
         <div>
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-follo-blue/10 text-follo-blue flex items-center justify-center">
-              <BarChart3 className="w-4 h-4" />
+            <div className="w-9 h-9 rounded-2xl bg-sky-50 text-follo-blue flex items-center justify-center border border-sky-100 shadow-2xs">
+              <BarChart3 className="w-5 h-5 text-follo-blue" />
             </div>
             <div>
-              <h2 className="text-lg font-black text-slate-900 tracking-tight">
-                Volume Transazioni Giornaliere Esercenti (D3.js)
-              </h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-black text-slate-900 tracking-tight">
+                  Volume Transazioni Giornaliere Esercenti (D3.js)
+                </h2>
+                <span className="hidden sm:inline-block text-[10px] font-black uppercase tracking-wider bg-sky-100 text-sky-800 px-2 py-0.5 rounded-md">
+                  Live Analytics
+                </span>
+              </div>
               <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
-                <span>Monitoraggio Incassi Follonica</span>
+                <span>Monitoraggio Incassi Ristoratori Follonica</span>
                 <span aria-hidden="true">·</span>
-                <span>Alimentato da d3.js</span>
+                <span>Libreria d3.js</span>
                 <span aria-hidden="true">·</span>
                 <span>Fuso Orario Europe/Rome</span>
               </div>
@@ -620,7 +781,7 @@ export default function AdminDailyTransactionsChart({
                 setSelectedMerchantId(e.target.value);
                 setSelectedDay(null);
               }}
-              className="text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-800 py-1.5 px-3 rounded-xl border border-transparent focus:outline-none focus:ring-2 focus:ring-follo-blue cursor-pointer transition-colors"
+              className="text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-800 py-1.5 px-3 rounded-xl border border-transparent focus:outline-none focus:ring-2 focus:ring-follo-blue cursor-pointer transition-colors max-w-[200px] truncate"
             >
               <option value="ALL">Tutti i Ristoranti (Consolidato)</option>
               {merchants.map(m => (
@@ -736,67 +897,98 @@ export default function AdminDailyTransactionsChart({
               30G
             </button>
           </div>
+
+          {/* Simulate New Order Button */}
+          {onSimulateOrder && (
+            <button
+              onClick={() => setIsSimulatorOpen(true)}
+              className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+              title="Simula un nuovo ordine test per osservare l'aggiornamento animato di D3"
+            >
+              <PlusCircle className="w-3.5 h-3.5 text-amber-400" />
+              <span>Simula Ordine</span>
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Aggregate KPI Summary Ribbon */}
+      {/* Aggregate KPI Summary Ribbon with Growth & Ticket */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-100">
-          <span className="text-[10px] font-bold uppercase text-slate-400 block tracking-wider">
-            Volume Totale ({timeRange} gg)
-          </span>
-          <div className="text-xl font-black text-slate-900 mt-1">
+        <div className="p-4 bg-gradient-to-br from-slate-50 to-sky-50/40 rounded-2xl border border-slate-200/80 shadow-2xs">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">
+              Volume Totale ({timeRange} gg)
+            </span>
+            {periodStats.growthPct !== 0 && (
+              <span className={`text-[10px] font-black flex items-center gap-0.5 ${
+                periodStats.growthPct > 0 ? 'text-emerald-600' : 'text-rose-600'
+              }`}>
+                <TrendingUp className="w-3 h-3" />
+                <span>{periodStats.growthPct > 0 ? `+${periodStats.growthPct}%` : `${periodStats.growthPct}%`}</span>
+              </span>
+            )}
+          </div>
+          <div className="text-2xl font-black text-slate-900 mt-1">
             €{periodStats.totalVol.toFixed(2)}
           </div>
-          <span className="text-[11px] text-slate-500 block">
-            {periodStats.totalOrders} ordini totali
+          <span className="text-[11px] text-slate-500 font-medium block mt-0.5">
+            {periodStats.totalOrders} ordini completati
           </span>
         </div>
 
-        <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-100">
+        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 shadow-2xs">
           <span className="text-[10px] font-bold uppercase text-slate-400 block tracking-wider">
             Media Giornaliera
           </span>
-          <div className="text-xl font-black text-follo-blue mt-1">
+          <div className="text-2xl font-black text-follo-blue mt-1">
             €{periodStats.dailyAvg.toFixed(2)}
           </div>
-          <span className="text-[11px] text-slate-500 block">
+          <span className="text-[11px] text-slate-500 font-medium block mt-0.5">
             Scontrino medio €{periodStats.avgTicketOverall.toFixed(2)}
           </span>
         </div>
 
-        <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-100">
-          <span className="text-[10px] font-bold uppercase text-slate-400 block tracking-wider">
-            Incasso Stripe Carta
-          </span>
-          <div className="text-xl font-black text-indigo-600 mt-1">
+        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 shadow-2xs">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">
+              Incasso Stripe Carta
+            </span>
+            <CreditCard className="w-3.5 h-3.5 text-indigo-500" />
+          </div>
+          <div className="text-2xl font-black text-indigo-600 mt-1">
             €{periodStats.cardVol.toFixed(2)}
           </div>
-          <span className="text-[11px] text-emerald-600 font-semibold block">
+          <span className="text-[11px] text-emerald-600 font-semibold block mt-0.5">
             {periodStats.cardPct}% quota digitale
           </span>
         </div>
 
-        <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-100">
-          <span className="text-[10px] font-bold uppercase text-slate-400 block tracking-wider">
-            Contanti alla Consegna
-          </span>
-          <div className="text-xl font-black text-amber-600 mt-1">
+        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 shadow-2xs">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">
+              Contanti alla Consegna
+            </span>
+            <Banknote className="w-3.5 h-3.5 text-amber-500" />
+          </div>
+          <div className="text-2xl font-black text-amber-600 mt-1">
             €{periodStats.cashVol.toFixed(2)}
           </div>
-          <span className="text-[11px] text-slate-500 block">
+          <span className="text-[11px] text-slate-500 font-medium block mt-0.5">
             {(100 - periodStats.cardPct).toFixed(1)}% saldo COD
           </span>
         </div>
 
-        <div className="col-span-2 md:col-span-1 p-3.5 bg-slate-50 rounded-2xl border border-slate-100">
-          <span className="text-[10px] font-bold uppercase text-slate-400 block tracking-wider">
-            Picco Massimo Giornaliero
-          </span>
-          <div className="text-xl font-black text-emerald-600 mt-1">
+        <div className="col-span-2 md:col-span-1 p-4 bg-slate-50 rounded-2xl border border-slate-200/80 shadow-2xs">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">
+              Picco Massimo
+            </span>
+            <Trophy className="w-3.5 h-3.5 text-amber-500" />
+          </div>
+          <div className="text-2xl font-black text-emerald-600 mt-1">
             €{periodStats.peakDay ? periodStats.peakDay.totalVolume.toFixed(2) : '0.00'}
           </div>
-          <span className="text-[11px] text-slate-500 block truncate">
+          <span className="text-[11px] text-slate-500 font-medium block mt-0.5 truncate">
             {periodStats.peakDay ? `${periodStats.peakDay.displayDate} (${periodStats.peakDay.orderCount} ordini)` : 'Nessun picco'}
           </span>
         </div>
@@ -807,10 +999,10 @@ export default function AdminDailyTransactionsChart({
         {/* Floating D3 Tooltip */}
         {hoveredDay && tooltipPos && (
           <div
-            className="absolute z-20 pointer-events-none bg-slate-900/95 backdrop-blur-md text-white p-3.5 rounded-2xl shadow-xl border border-slate-700 text-xs space-y-1.5 w-64 animate-in fade-in"
+            className="absolute z-20 pointer-events-none bg-slate-900/95 backdrop-blur-md text-white p-3.5 rounded-2xl shadow-2xl border border-slate-700 text-xs space-y-1.5 w-68 animate-in fade-in"
             style={{
-              left: Math.min(Math.max(10, tooltipPos.x - 120), (containerRef.current?.clientWidth || 800) - 270),
-              top: Math.max(10, tooltipPos.y - 140)
+              left: Math.min(Math.max(10, tooltipPos.x - 120), (containerRef.current?.clientWidth || 800) - 290),
+              top: Math.max(10, tooltipPos.y - 150)
             }}
           >
             <div className="flex items-center justify-between border-b border-slate-800 pb-1.5">
@@ -846,7 +1038,7 @@ export default function AdminDailyTransactionsChart({
                 </span>
               </div>
               <div className="flex items-center justify-between text-[11px]">
-                <span className="text-slate-400">Ordini / Scontrino Medio:</span>
+                <span className="text-slate-400">Ordini / Scontrino:</span>
                 <span className="text-slate-200 font-semibold">
                   {hoveredDay.orderCount} ordini · €{hoveredDay.avgTicket.toFixed(2)}
                 </span>
@@ -861,8 +1053,8 @@ export default function AdminDailyTransactionsChart({
                 </div>
               )}
             </div>
-            <div className="text-[9px] text-slate-500 text-center pt-1">
-              Clicca sulla barra per ispezionare gli ordini del giorno
+            <div className="text-[9px] text-slate-400 text-center pt-1 border-t border-slate-800/80">
+              💡 Clicca sulla barra per aprire la lista ordini dettagliata
             </div>
           </div>
         )}
@@ -870,23 +1062,23 @@ export default function AdminDailyTransactionsChart({
         {/* SVG Chart Element */}
         <svg ref={svgRef} className="w-full select-none" />
 
-        {/* Chart Legend */}
+        {/* Chart Legend & Interactive Hints */}
         <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100 text-xs">
           <div className="flex items-center gap-4">
             {breakdownMode === 'payment_method' && metric === 'volume' ? (
               <>
                 <div className="flex items-center gap-1.5">
-                  <span className="w-3 h-3 rounded-sm bg-indigo-600 inline-block"></span>
-                  <span className="font-semibold text-slate-700">Carta Stripe</span>
+                  <span className="w-3 h-3 rounded-sm bg-indigo-600 inline-block shadow-2xs"></span>
+                  <span className="font-semibold text-slate-700">Carta Stripe (Online)</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <span className="w-3 h-3 rounded-sm bg-amber-500 inline-block"></span>
-                  <span className="font-semibold text-slate-700">Contanti alla Consegna</span>
+                  <span className="w-3 h-3 rounded-sm bg-amber-500 inline-block shadow-2xs"></span>
+                  <span className="font-semibold text-slate-700">Contanti alla Consegna (COD)</span>
                 </div>
               </>
             ) : (
               <div className="flex items-center gap-1.5">
-                <span className="w-3 h-3 rounded-sm bg-sky-600 inline-block"></span>
+                <span className="w-3 h-3 rounded-sm bg-sky-600 inline-block shadow-2xs"></span>
                 <span className="font-semibold text-slate-700">
                   {metric === 'volume' ? 'Volume Totale Transato (€)' : metric === 'orders' ? 'Numero Ordini Evasi' : 'Commissione Piattaforma (8%)'}
                 </span>
@@ -898,12 +1090,68 @@ export default function AdminDailyTransactionsChart({
             </div>
           </div>
 
-          <div className="text-slate-400 text-[11px] font-medium flex items-center gap-1">
+          <div className="text-slate-500 text-[11px] font-medium flex items-center gap-1">
             <Info className="w-3.5 h-3.5 text-slate-400" />
-            <span>Passa il mouse sulle barre per i dettagli · Clicca per aprire il registro ordini</span>
+            <span>Passa il mouse sulle barre per i dati analitici · Clicca per visualizzare gli scontrini</span>
           </div>
         </div>
       </div>
+
+      {/* Top 3 Ristoranti Leaderboard del Periodo */}
+      {selectedMerchantId === 'ALL' && topMerchants.length > 0 && (
+        <div className="pt-2 border-t border-slate-100">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-1.5">
+              <Trophy className="w-4 h-4 text-amber-500" />
+              <span className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                Top 3 Esercenti per Volume Transato ({timeRange} Giorni)
+              </span>
+            </div>
+            <span className="text-[11px] text-slate-400 font-medium">
+              Quota sul transato consolidato
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {topMerchants.map((tm, idx) => (
+              <div
+                key={tm.id}
+                onClick={() => setSelectedMerchantId(tm.id)}
+                className="p-3.5 rounded-2xl bg-slate-50 hover:bg-slate-100/80 border border-slate-200/80 transition-all cursor-pointer flex items-center justify-between gap-3 group"
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-black text-xs ${
+                    idx === 0
+                      ? 'bg-amber-400 text-amber-950 shadow-xs'
+                      : idx === 1
+                      ? 'bg-slate-300 text-slate-800'
+                      : 'bg-amber-700/20 text-amber-800'
+                  }`}>
+                    {idx === 0 ? '1°' : idx === 1 ? '2°' : '3°'}
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-900 group-hover:text-follo-blue transition-colors">
+                      {tm.name}
+                    </h4>
+                    <span className="text-[10px] text-slate-500 block">
+                      {tm.ordersCount} ordini evasi
+                    </span>
+                  </div>
+                </div>
+
+                <div className="text-right shrink-0">
+                  <span className="text-xs font-black text-slate-900 block">
+                    €{tm.volume.toFixed(2)}
+                  </span>
+                  <span className="text-[10px] font-bold text-follo-blue">
+                    {tm.percentOfTotal}% quota
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Day Inspector Card (Shown when a bar is clicked) */}
       {selectedDay && (
@@ -923,9 +1171,9 @@ export default function AdminDailyTransactionsChart({
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-4">
               <div className="text-right">
-                <span className="text-xs text-slate-400 block">Totale Giorno</span>
+                <span className="text-xs text-slate-400 block">Volume Totale Giorno</span>
                 <span className="text-lg font-black text-emerald-400">
                   €{selectedDay.totalVolume.toFixed(2)}
                 </span>
@@ -992,6 +1240,89 @@ export default function AdminDailyTransactionsChart({
               Nessuna transazione registrata per la data o il ristoratore selezionato.
             </p>
           )}
+        </div>
+      )}
+
+      {/* Simulator Modal for Admin Quick Testing */}
+      {isSimulatorOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4 animate-in fade-in">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <Receipt className="w-5 h-5 text-follo-blue" />
+                <h3 className="font-black text-slate-900 text-base">Simula Nuova Transazione</h3>
+              </div>
+              <button
+                onClick={() => setIsSimulatorOpen(false)}
+                className="p-1 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-500 leading-relaxed">
+              Genera istantaneamente una transazione di test a nome di un ristoratore per testare la risposta animata del grafico D3.js in tempo reale.
+            </p>
+
+            <form onSubmit={handleSimulateSubmit} className="space-y-3">
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">Ristoratore Follonica</label>
+                <select
+                  value={simMerchantId}
+                  onChange={e => setSimMerchantId(e.target.value)}
+                  className="w-full text-xs font-semibold p-2.5 rounded-xl border border-slate-300 bg-white focus:ring-2 focus:ring-follo-blue"
+                >
+                  {merchants.map(m => (
+                    <option key={m.id} value={m.id}>{m.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">Importo Ordine (€)</label>
+                  <input
+                    type="number"
+                    step="0.50"
+                    min="5"
+                    max="300"
+                    value={simAmount}
+                    onChange={e => setSimAmount(e.target.value)}
+                    className="w-full text-xs font-semibold p-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-follo-blue"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">Metodo Pagamento</label>
+                  <select
+                    value={simPaymentMethod}
+                    onChange={e => setSimPaymentMethod(e.target.value as 'CARD' | 'CASH')}
+                    className="w-full text-xs font-semibold p-2.5 rounded-xl border border-slate-300 bg-white focus:ring-2 focus:ring-follo-blue"
+                  >
+                    <option value="CARD">Carta Stripe (Online)</option>
+                    <option value="CASH">Contanti alla Consegna (COD)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsSimulatorOpen(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors"
+                >
+                  Annulla
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-follo-blue hover:bg-follo-blue-dark text-white text-xs font-bold shadow-md transition-all flex items-center gap-1.5"
+                >
+                  <PlusCircle className="w-3.5 h-3.5" />
+                  <span>Registra Transazione Live</span>
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>

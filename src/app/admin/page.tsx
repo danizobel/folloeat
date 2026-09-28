@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import Logo from '@/components/Logo';
 import {
@@ -31,7 +31,8 @@ import {
   X,
   MapPin,
   Check,
-  LogOut
+  LogOut,
+  Search
 } from 'lucide-react';
 import { HardwareDevice, DepositStatus, SponsoredNotification, Merchant, Order } from '@/lib/types';
 import { validateFollonicaAddress } from '@/lib/address-validation';
@@ -82,6 +83,10 @@ export default function SuperAdminPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Table 1 search & tier filters
+  const [merchantSearch, setMerchantSearch] = useState('');
+  const [merchantTierFilter, setMerchantTierFilter] = useState<'ALL' | 'SPOTLIGHT' | 'PARTNER' | 'DIRECTORY'>('ALL');
 
   // Authentication gate state
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -249,6 +254,48 @@ export default function SuperAdminPage() {
       setIsSubmitting(false);
     }
   };
+
+  const handleSimulateOrder = async (fakeOrder: Order) => {
+    // Optimistically prepend to chart orders
+    setOrders(prev => [fakeOrder, ...prev]);
+    try {
+      await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          merchant_id: fakeOrder.merchant_id,
+          customer_name: fakeOrder.customer_name,
+          customer_phone: fakeOrder.customer_phone,
+          delivery_address: fakeOrder.delivery_address,
+          total_food_amount: fakeOrder.total_food_amount,
+          payment_method: fakeOrder.payment_method,
+          items: [{ id: 'sim_01', name: 'Ordine Test SuperAdmin', price: fakeOrder.total_food_amount, quantity: 1 }]
+        })
+      });
+      setFeedbackMsg(`Transazione registrata con successo per ${fakeOrder.merchant_name}: €${fakeOrder.total_order_amount.toFixed(2)}`);
+      setTimeout(() => setFeedbackMsg(null), 4000);
+      await fetchAdminData();
+    } catch (e) {
+      console.error('Error simulating order:', e);
+    }
+  };
+
+  const filteredMerchants = useMemo(() => {
+    return merchants.filter(m => {
+      if (merchantTierFilter === 'SPOTLIGHT' && m.is_spotlight !== 1) return false;
+      if (merchantTierFilter === 'PARTNER' && (m.is_accredited !== 1 || m.is_spotlight === 1)) return false;
+      if (merchantTierFilter === 'DIRECTORY' && m.is_accredited === 1) return false;
+
+      if (merchantSearch.trim()) {
+        const q = merchantSearch.toLowerCase().trim();
+        const matchesName = m.name.toLowerCase().includes(q);
+        const matchesCat = (m.category || '').toLowerCase().includes(q);
+        const matchesAddr = (m.address || '').toLowerCase().includes(q);
+        return matchesName || matchesCat || matchesAddr;
+      }
+      return true;
+    });
+  }, [merchants, merchantSearch, merchantTierFilter]);
 
   const handleUpdateMerchantTier = async (merchantId: string, isAccredited: number, isSpotlight: number) => {
     try {
@@ -640,6 +687,7 @@ export default function SuperAdminPage() {
           orders={orders}
           merchants={merchants}
           isLoading={isLoading}
+          onSimulateOrder={handleSimulateOrder}
         />
 
         {/* Table 1: Anagrafica Locali & Gestione Onboarding Follonica (3 Livelli) */}
@@ -670,6 +718,71 @@ export default function SuperAdminPage() {
             </div>
           </div>
 
+          {/* Quick Search & Tier Filter Bar */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 pb-1">
+            <div className="relative w-full sm:w-72">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Cerca per nome, via o categoria..."
+                value={merchantSearch}
+                onChange={(e) => setMerchantSearch(e.target.value)}
+                className="w-full pl-9 pr-8 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-follo-blue"
+              />
+              {merchantSearch && (
+                <button
+                  onClick={() => setMerchantSearch('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl overflow-x-auto w-full sm:w-auto">
+              <button
+                onClick={() => setMerchantTierFilter('ALL')}
+                className={`px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                  merchantTierFilter === 'ALL'
+                    ? 'bg-white text-slate-900 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Tutti ({merchants.length})
+              </button>
+              <button
+                onClick={() => setMerchantTierFilter('SPOTLIGHT')}
+                className={`px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                  merchantTierFilter === 'SPOTLIGHT'
+                    ? 'bg-white text-amber-700 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                🥇 Spotlight ({merchants.filter(m => m.is_spotlight === 1).length})
+              </button>
+              <button
+                onClick={() => setMerchantTierFilter('PARTNER')}
+                className={`px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                  merchantTierFilter === 'PARTNER'
+                    ? 'bg-white text-sky-700 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                🥈 Partner ({merchants.filter(m => m.is_accredited === 1 && m.is_spotlight !== 1).length})
+              </button>
+              <button
+                onClick={() => setMerchantTierFilter('DIRECTORY')}
+                className={`px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                  merchantTierFilter === 'DIRECTORY'
+                    ? 'bg-white text-slate-700 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                🥉 Directory ({merchants.filter(m => m.is_accredited === 0).length})
+              </button>
+            </div>
+          </div>
+
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-100/80 text-slate-600 uppercase font-bold text-[10px] tracking-wider rounded-xl">
@@ -684,7 +797,7 @@ export default function SuperAdminPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {merchants.map(m => {
+                {filteredMerchants.map(m => {
                   const assignedDevice = hardware.find(d => d.merchant_id === m.id);
                   return (
                     <tr key={m.id} className="hover:bg-slate-50/70 transition-colors">
