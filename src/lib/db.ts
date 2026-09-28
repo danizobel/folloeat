@@ -311,15 +311,6 @@ function getCloudflareD1(): D1Database | null {
   if (typeof (process.env as any).DB !== 'undefined') {
     return (process.env as any).DB as D1Database;
   }
-  try {
-    const { getRequestContext } = require('@cloudflare/next-on-pages');
-    const ctx = getRequestContext();
-    if (ctx?.env?.DB) {
-      return ctx.env.DB as D1Database;
-    }
-  } catch {
-    // Not running inside @cloudflare/next-on-pages
-  }
   return null;
 }
 

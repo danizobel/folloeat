@@ -67,7 +67,7 @@ npm start
 ### 🖨️ Terminale Ristoratore (Sunmi V2s & Tablet)
 - `/merchant/[slug]`:
   - `pizzeria-da-michele`: Pizzeria Da Michele & Figli (Senzuno)
-  - `maremma-smash-burger`: Maremma Smash Burger (Centro Storico)
+  - `da-poldo`: Da Poldo Food & Love (Via Marconi 18 / Centro)
   - `bagno-florida`: Bagno Florida Ristorante sul Mare (Pratoranieri)
 - **Allarme sonoro loop continuo** ad alto volume tramite Web Audio API, che si arresta unicamente alla pressione di "Accetta Ordine" o "Rifiuta".
 - **Payload Stampante Termica 58mm**: Generazione scontrino 32 colonne ESC/POS per Sunmi V2s.

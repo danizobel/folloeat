@@ -1,5 +1,7 @@
 'use client';
 
+export const runtime = 'edge';
+
 import React, { useState, useEffect } from 'react';
 import Header from '@/components/Header';
 import InteractiveMap from '@/components/InteractiveMap';

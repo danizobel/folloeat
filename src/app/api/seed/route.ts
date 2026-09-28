@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+
+export const runtime = 'edge';
 import { seedInitialData } from '@/lib/db';
 
 export async function GET() {

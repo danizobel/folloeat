@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+
+export const runtime = 'edge';
 import { getReservations, createReservation } from '@/lib/db';
 
 export async function GET(req: NextRequest) {

@@ -33,21 +33,21 @@ export const INITIAL_MERCHANTS: Merchant[] = [
     min_order: 12.00
   },
   {
-    id: "m_smash_02",
-    google_place_id: "ChIJ_follonica_smash_02",
-    name: "Maremma Smash Burger",
-    slug: "maremma-smash-burger",
+    id: "m_poldo_02",
+    google_place_id: "ChIJ_follonica_poldo_02",
+    name: "Da Poldo Food & Love",
+    slug: "da-poldo",
     plan_type: "PRO",
     setup_fee_paid: 199.00,
     hardware_deposit: 150.00,
     monthly_saas_fee: 29.00,
     commission_rate: 0.08,
-    stripe_account_id: "acct_smash_follonica",
+    stripe_account_id: "acct_poldo_follonica",
     phone: "+39 0566 41250",
     emergency_phone: "+39 340 7654321",
-    address: "Corso Roma 88, 58022 Follonica (GR)",
-    lat: 42.9255,
-    lng: 10.7580,
+    address: "Via Guglielmo Marconi 18, 58022 Follonica (GR)",
+    lat: 42.9240,
+    lng: 10.7570,
     is_partner: 1,
     snooze_until: null,
     prep_delay_minutes: 0,
@@ -57,8 +57,8 @@ export const INITIAL_MERCHANTS: Merchant[] = [
     max_orders_per_slot: 15,
     created_at: "2024-03-10T11:00:00Z",
     rating: 4.9,
-    review_count: 218,
-    category: "Smash Burger Chianina IGP & Fries",
+    review_count: 320,
+    category: "Paninoteca Artigianale & Burger Gourmet",
     hero_image: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=800&q=80",
     delivery_time_est: "20-30 min",
     min_order: 15.00
@@ -108,8 +108,8 @@ export const INITIAL_HARDWARE_DEVICES: HardwareDevice[] = [
   },
   {
     device_id: "SNM-V2S-FOLLO-002",
-    merchant_id: "m_smash_02",
-    merchant_name: "Maremma Smash Burger",
+    merchant_id: "m_poldo_02",
+    merchant_name: "Da Poldo Food & Love",
     model: "Sunmi V2s",
     deposit_amount: 150.00,
     deposit_status: "HELD",
@@ -220,7 +220,7 @@ export const INITIAL_MENU_ITEMS: MenuItem[] = [
   // Maremma Smash Burger
   {
     id: "mi_smash_01",
-    merchant_id: "m_smash_02",
+    merchant_id: "m_poldo_02",
     category: "Smash Burgers",
     name: "Smash Chianina IGP Classic",
     description: "Doppio patty 2x100g di Chianina IGP certificata, American cheddar originale fuso, cipolla caramellata di Certaldo, salsa segreta Follo, brioche bun artigianale tostato al burro",
@@ -233,7 +233,7 @@ export const INITIAL_MENU_ITEMS: MenuItem[] = [
   },
   {
     id: "mi_smash_02",
-    merchant_id: "m_smash_02",
+    merchant_id: "m_poldo_02",
     category: "Smash Burgers",
     name: "Bacon Maremmano Croccante",
     description: "Doppio patty Chianina IGP, quadruplo bacon toscano croccante affumicato al legno di faggio, doppio cheddar, salsa BBQ artigianale",
@@ -246,7 +246,7 @@ export const INITIAL_MENU_ITEMS: MenuItem[] = [
   },
   {
     id: "mi_smash_03",
-    merchant_id: "m_smash_02",
+    merchant_id: "m_poldo_02",
     category: "Smash Burgers",
     name: "Truffle & Pecorino Toscano DOP",
     description: "Doppio patty Chianina, fonduta vellutata di Pecorino Toscano DOP stagionato, salsa tartufata dei boschi maremmani, rucola selvatica",
@@ -258,7 +258,7 @@ export const INITIAL_MENU_ITEMS: MenuItem[] = [
   },
   {
     id: "mi_smash_04",
-    merchant_id: "m_smash_02",
+    merchant_id: "m_poldo_02",
     category: "Side & Fries",
     name: "Patate Rustiche con Buccia e Rosmarino",
     description: "Patate toscane a spicchi dorate con sale grosso di salina e rosmarino fresco",
@@ -270,7 +270,7 @@ export const INITIAL_MENU_ITEMS: MenuItem[] = [
   },
   {
     id: "mi_smash_05",
-    merchant_id: "m_smash_02",
+    merchant_id: "m_poldo_02",
     category: "Side & Fries",
     name: "Nuggets di Pollo Toscano (6 pezzi)",
     description: "Bocconcini di petto di pollo allevato a terra impanati nei corn-flakes, serviti con maionese al pepe nero",
@@ -282,7 +282,7 @@ export const INITIAL_MENU_ITEMS: MenuItem[] = [
   },
   {
     id: "mi_smash_06",
-    merchant_id: "m_smash_02",
+    merchant_id: "m_poldo_02",
     category: "Birre Artigianali & Soft",
     name: "Birra Ichnusa Non Filtrata 50cl",
     description: "Lager bionda corposa non filtrata a bassa fermentazione, 5.0% vol.",
@@ -294,7 +294,7 @@ export const INITIAL_MENU_ITEMS: MenuItem[] = [
   },
   {
     id: "mi_smash_07",
-    merchant_id: "m_smash_02",
+    merchant_id: "m_poldo_02",
     category: "Birre Artigianali & Soft",
     name: "Coca Cola Zero 33cl",
     description: "In lattina fredda",
@@ -433,8 +433,8 @@ export const INITIAL_ORDERS: Order[] = [
   },
   {
     id: "ORD-2024-1003",
-    merchant_id: "m_smash_02",
-    merchant_name: "Maremma Smash Burger",
+    merchant_id: "m_poldo_02",
+    merchant_name: "Da Poldo Food & Love",
     customer_name: "Leonardo Fabbri",
     customer_phone: "+39 328 5544332",
     delivery_address: "Via delle Collacchie 14, Senzuno",
@@ -500,11 +500,11 @@ export const INITIAL_REVIEWS: Review[] = [
   },
   {
     id: "rev_02",
-    merchant_id: "m_smash_02",
+    merchant_id: "m_poldo_02",
     customer_phone: "+39 328 5544332",
     rating: 5,
     tags: "Carne di Chianina favolosa, Croccantezza top",
-    comment: "Lo smash burger con la Chianina è su un altro pianeta rispetto alle catene standard. Bravi ragazzi!",
+    comment: "I panini e gli hamburger di Da Poldo a Follonica sono una certezza assoluta. Pane artigianale e ingredienti freschissimi!",
     created_at: "2024-07-18T22:15:00Z"
   },
   {
@@ -521,8 +521,8 @@ export const INITIAL_REVIEWS: Review[] = [
 export const INITIAL_NOTIFICATIONS: SponsoredNotification[] = [
   {
     id: "notif_01",
-    merchant_id: "m_smash_02",
-    merchant_name: "Maremma Smash Burger",
+    merchant_id: "m_poldo_02",
+    merchant_name: "Da Poldo Food & Love",
     title: "🍔 Stasera Special Smash Maremmano al Tartufo!",
     body: "Solo per stasera a Follonica: Smash Chianina DOP con Pecorino e Tartufo fresco. Ordina subito!",
     target_zone: "ALL",

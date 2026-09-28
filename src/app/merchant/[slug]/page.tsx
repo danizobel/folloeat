@@ -1,5 +1,7 @@
 'use client';
 
+export const runtime = 'edge';
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -238,7 +240,7 @@ export default function MerchantTerminalPage() {
             className="px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs font-semibold text-slate-300 focus:outline-none focus:ring-2 focus:ring-follo-blue"
           >
             <option value="pizzeria-da-michele">Pizzeria Da Michele & Figli</option>
-            <option value="maremma-smash-burger">Maremma Smash Burger</option>
+            <option value="da-poldo">Da Poldo Food & Love</option>
             <option value="bagno-florida">Bagno Florida Ristorante</option>
           </select>
 
