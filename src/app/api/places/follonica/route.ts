@@ -178,7 +178,7 @@ export async function GET(req: NextRequest) {
 
       enrichedResults.push({
         ...m,
-        is_partner: 1,
+        is_partner: (m.is_accredited === 1 || m.is_partner === 1) ? 1 : 0,
         distance_km: distance,
         menu_preview: menu.slice(0, 3)
       });
@@ -211,10 +211,15 @@ export async function GET(req: NextRequest) {
           hardware_deposit: 0,
           monthly_saas_fee: 0,
           commission_rate: 0.08,
-          phone: "Richiedi su FolloEat",
+          phone: "+39 0566 40000",
           address: ext.address,
           lat: ext.lat,
           lng: ext.lng,
+          is_accredited: 0, // Livello 3: Solo directory
+          is_spotlight: 0,
+          has_gluten_free: 0,
+          has_lactose_free: 0,
+          has_vegan: 0,
           is_partner: 0, // Unpartnered
           prep_delay_minutes: 0,
           max_orders_per_slot: 10,
@@ -236,13 +241,26 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // Sort: Partner merchants first, then by distance
+    // Master v4.1: Algoritmo di Ordinamento Multilivello
+    // 1. Livello 1: SPONSORIZZATI (Spotlight Premium) in cima assoluta
+    // 2. Livello 2: ACCREDITATI / PARTNER FOLLOEAT (Piano SMART o PRO)
+    // 3. Livello 3: NON ACCREDITATI / DIRECTORY DIRETTA (in coda, ordinati per distanza)
     finalResults.sort((a, b) => {
-      if (a.is_partner !== b.is_partner) {
-        return b.is_partner - a.is_partner;
+      const aSpotlight = a.is_spotlight || 0;
+      const bSpotlight = b.is_spotlight || 0;
+      if (aSpotlight !== bSpotlight) {
+        return bSpotlight - aSpotlight;
       }
+
+      const aAcc = a.is_accredited !== undefined ? a.is_accredited : (a.is_partner || 0);
+      const bAcc = b.is_accredited !== undefined ? b.is_accredited : (b.is_partner || 0);
+      if (aAcc !== bAcc) {
+        return bAcc - aAcc;
+      }
+
       return (a.distance_km || 0) - (b.distance_km || 0);
     });
+
 
     return NextResponse.json({
       success: true,

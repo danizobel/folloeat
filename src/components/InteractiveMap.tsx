@@ -90,94 +90,148 @@ export default function InteractiveMap({
     places.forEach(place => {
       if (!place.lat || !place.lng) return;
 
-      const isPartner = place.is_partner === 1;
+      const isSpotlight = place.is_spotlight === 1;
+      const isAccredited = place.is_accredited === 1 || place.is_partner === 1;
       const isSelected = selectedPlace?.id === place.id;
 
-      const pinColor = isPartner ? '#0284C7' : '#64748B';
-      const badgeIcon = isPartner ? '🍕' : '🍴';
+      let pinColor = '#64748B'; // Default Level 3 Directory
+      let badgeIcon = '🍴';
+      let pinSize = 34;
+      let glowStyle = 'box-shadow: 0 4px 10px rgba(0,0,0,0.25);';
+
+      if (isSpotlight) {
+        // Level 1: Spotlight Premium
+        pinColor = '#F59E0B';
+        badgeIcon = '⭐';
+        pinSize = 44;
+        glowStyle = 'box-shadow: 0 0 16px rgba(245, 158, 11, 0.8), 0 4px 10px rgba(0,0,0,0.3);';
+      } else if (isAccredited) {
+        // Level 2: Accredited Partner
+        pinColor = '#0284C7';
+        badgeIcon = '🍕';
+        pinSize = 38;
+        glowStyle = 'box-shadow: 0 4px 12px rgba(2, 132, 199, 0.4);';
+      }
+
+      if (isSelected) {
+        pinColor = '#EF4444';
+      }
 
       const customIcon = L.divIcon({
         className: 'custom-leaflet-marker',
         html: `
           <div style="
             position: relative;
-            background: ${isSelected ? '#EF4444' : pinColor};
-            width: 38px;
-            height: 38px;
+            background: ${pinColor};
+            width: ${pinSize}px;
+            height: ${pinSize}px;
             border-radius: 50% 50% 50% 0;
             transform: rotate(-45deg);
             display: flex;
             align-items: center;
             justify-content: center;
-            border: 3px solid #ffffff;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            border: ${isSpotlight ? '3.5px solid #FEF08A' : '3px solid #ffffff'};
+            ${glowStyle}
             cursor: pointer;
             transition: transform 0.2s ease;
           ">
             <span style="
               transform: rotate(45deg);
-              font-size: 16px;
+              font-size: ${isSpotlight ? '18px' : '15px'};
             ">${badgeIcon}</span>
-            ${isPartner ? `
+            ${isSpotlight ? `
               <div style="
                 position: absolute;
-                top: -4px;
-                right: -4px;
+                top: -6px;
+                right: -6px;
+                background: #F59E0B;
+                color: #FFFFFF;
+                font-size: 8px;
+                font-weight: 900;
+                padding: 1px 4px;
+                border-radius: 9999px;
+                border: 1.5px solid white;
+              ">TOP</div>
+            ` : isAccredited ? `
+              <div style="
+                position: absolute;
+                top: -3px;
+                right: -3px;
                 background: #EF4444;
-                width: 12px;
-                height: 12px;
+                width: 10px;
+                height: 10px;
                 border-radius: 50%;
                 border: 2px solid white;
               "></div>
             ` : ''}
           </div>
         `,
-        iconSize: [38, 38],
-        iconAnchor: [19, 38],
-        popupAnchor: [0, -38]
+        iconSize: [pinSize, pinSize],
+        iconAnchor: [pinSize / 2, pinSize],
+        popupAnchor: [0, -pinSize]
       });
 
       const marker = L.marker([place.lat, place.lng], { icon: customIcon }).addTo(map);
 
       const popupHtml = `
-        <div style="font-family: inherit; min-width: 200px; padding: 4px;">
-          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
-            <span style="font-size: 11px; font-weight: bold; text-transform: uppercase; color: ${isPartner ? '#0284C7' : '#64748B'}; background: ${isPartner ? '#E0F2FE' : '#F1F5F9'}; padding: 2px 6px; border-radius: 4px;">
-              ${isPartner ? '★ PARTNER FOLLOEAT' : 'LOCALE CENSITO'}
+        <div style="font-family: inherit; min-width: 220px; padding: 4px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+            <span style="font-size: 10px; font-weight: 800; text-transform: uppercase; color: ${
+              isSpotlight ? '#B45309' : isAccredited ? '#0284C7' : '#64748B'
+            }; background: ${
+              isSpotlight ? '#FEF3C7' : isAccredited ? '#E0F2FE' : '#F1F5F9'
+            }; padding: 3px 7px; border-radius: 6px;">
+              ${isSpotlight ? '👑 SPONSORIZZATO' : isAccredited ? '★ PARTNER FOLLOEAT' : 'DIRECTORY DIRETTA'}
             </span>
             ${place.rating ? `<span style="font-size: 12px; font-weight: bold; color: #F59E0B;">★ ${place.rating}</span>` : ''}
           </div>
-          <h3 style="font-weight: 700; font-size: 14px; margin: 0 0 4px 0; color: #0F172A;">${place.name}</h3>
-          <p style="font-size: 12px; color: #64748B; margin: 0 0 8px 0;">${place.address}</p>
-          ${isPartner ? `
-            <button id="btn-select-${place.id}" style="
-              width: 100%;
-              background: #0284C7;
-              color: white;
-              border: none;
-              padding: 8px 12px;
-              border-radius: 6px;
-              font-weight: 600;
-              font-size: 12px;
-              cursor: pointer;
-            ">Vedi Menu & Ordina</button>
+          <h3 style="font-weight: 800; font-size: 14px; margin: 0 0 4px 0; color: #0F172A;">${place.name}</h3>
+          <p style="font-size: 12px; color: #64748B; margin: 0 0 10px 0;">${place.address}</p>
+          ${isAccredited ? `
+            <div style="display: flex; gap: 6px;">
+              <button id="btn-select-${place.id}" style="
+                flex: 1;
+                background: #0284C7;
+                color: white;
+                border: none;
+                padding: 8px 10px;
+                border-radius: 8px;
+                font-weight: 700;
+                font-size: 11px;
+                cursor: pointer;
+              ">Vedi Menu</button>
+            </div>
           ` : `
-            <button id="btn-signal-${place.id}" style="
-              width: 100%;
-              background: #F1F5F9;
-              color: #0F172A;
-              border: 1px solid #CBD5E1;
-              padding: 8px 12px;
-              border-radius: 6px;
-              font-weight: 600;
-              font-size: 11px;
-              cursor: pointer;
-            ">Segnala locale a FolloEat</button>
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+              <a href="tel:${place.phone}" style="
+                display: block;
+                text-align: center;
+                text-decoration: none;
+                background: #0F172A;
+                color: white;
+                padding: 8px 12px;
+                border-radius: 8px;
+                font-weight: 700;
+                font-size: 12px;
+              ">📞 Chiama (${place.phone})</a>
+              <button id="btn-signal-${place.id}" style="
+                width: 100%;
+                background: #F8FAFC;
+                color: #64748B;
+                border: 1px solid #E2E8F0;
+                padding: 6px 10px;
+                border-radius: 6px;
+                font-weight: 600;
+                font-size: 10px;
+                cursor: pointer;
+              ">Segnala a FolloEat</button>
+            </div>
           `}
         </div>
       `;
 
       marker.bindPopup(popupHtml);
+
 
       marker.on('popupopen', () => {
         const btnSelect = document.getElementById(`btn-select-${place.id}`);

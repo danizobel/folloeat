@@ -28,7 +28,7 @@ import {
   Copy,
   Check
 } from 'lucide-react';
-import { Order, Merchant, OrderItem } from '@/lib/types';
+import { Order, Merchant, OrderItem, OrderStatus } from '@/lib/types';
 import { generateSunmi58mmThermalReceipt } from '@/lib/thermal-printer';
 import { orderAlarm } from '@/lib/audio-alarm';
 
@@ -114,8 +114,8 @@ export default function MerchantTerminalPage() {
     }, 400);
   };
 
-  // Order Actions: Accept or Reject
-  const handleUpdateOrderStatus = async (orderId: string, newStatus: 'ACCEPTED' | 'CANCELLED') => {
+  // Order Actions: Accept, Reject, Delivering, Completed
+  const handleUpdateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
     try {
       const res = await fetch(`/api/orders/${orderId}`, {
         method: 'PATCH',
@@ -559,30 +559,47 @@ export default function MerchantTerminalPage() {
                       <span className="font-black text-white">€{order.total_order_amount.toFixed(2)}</span>
                     </div>
 
-                    <p className="text-xs text-slate-400 flex items-center gap-1">
-                      <MapPin className="w-3.5 h-3.5 text-follo-red" />
-                      {order.pickup_point || order.delivery_address}
-                    </p>
+                    <div className="flex items-center justify-between text-xs">
+                      <p className="text-slate-400 flex items-center gap-1">
+                        <MapPin className="w-3.5 h-3.5 text-follo-red" />
+                        {order.pickup_point || order.delivery_address}
+                      </p>
+                      {order.delivery_pin && (
+                        <span className="text-[11px] font-black text-amber-400 bg-amber-950/80 px-2 py-0.5 rounded border border-amber-800">
+                          PIN: {order.delivery_pin}
+                        </span>
+                      )}
+                    </div>
 
                     <div className="flex gap-2 pt-2 border-t border-slate-800">
                       <button
                         onClick={() => handleOpenThermalPrint(order)}
-                        className="flex-1 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center justify-center gap-1.5"
+                        className="py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center justify-center gap-1.5"
                       >
                         <Printer className="w-3.5 h-3.5 text-follo-blue" />
                         <span>Scontrino 58mm</span>
                       </button>
-                      <button
-                        onClick={() => handleUpdateOrderStatus(order.id, 'COMPLETED' as any)}
-                        className="px-4 py-2 rounded-xl bg-follo-blue hover:bg-follo-blue-dark text-white text-xs font-bold"
-                      >
-                        Completato
-                      </button>
+                      {order.status === 'ACCEPTED' ? (
+                        <button
+                          onClick={() => handleUpdateOrderStatus(order.id, 'DELIVERING')}
+                          className="flex-1 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold transition-colors"
+                        >
+                          Affida al Rider
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleUpdateOrderStatus(order.id, 'COMPLETED')}
+                          className="flex-1 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-colors"
+                        >
+                          Consegna Conclusa
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}
               </div>
             )}
+
           </div>
         </div>
       </div>

@@ -192,6 +192,47 @@ export default function OrderTrackingPage() {
                 </div>
               )}
 
+              {/* PIN di Consegna & Tracking */}
+              {order.delivery_pin && (
+                <div className="p-4 rounded-2xl bg-amber-50/90 border border-amber-200 flex items-center justify-between shadow-xs">
+                  <div>
+                    <span className="text-[10px] font-black uppercase text-amber-800 tracking-wider block">
+                      PIN Di Consegna Rider
+                    </span>
+                    <span className="text-xs text-amber-700">
+                      Mostra o comunica questo PIN al rider per convalidare il ritiro
+                    </span>
+                  </div>
+                  <div className="text-2xl font-black tracking-widest text-amber-900 bg-white px-3.5 py-1.5 rounded-xl border border-amber-300 shadow-xs">
+                    {order.delivery_pin}
+                  </div>
+                </div>
+              )}
+
+              {/* Status specific notices */}
+              {order.status === 'DELIVERING' && (
+                <div className="p-4 rounded-2xl bg-sky-50 border border-sky-200 flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <Bike className="w-5 h-5 text-follo-blue animate-bounce" />
+                    <div>
+                      <span className="text-xs font-black text-slate-900 block">
+                        Rider in arrivo (stima 10-15 min)
+                      </span>
+                      <span className="text-[11px] text-slate-500">
+                        Il fattorino ha preso in carico la comanda e si sta dirigendo al tuo indirizzo
+                      </span>
+                    </div>
+                  </div>
+                  <a
+                    href={`tel:${order.customer_phone}`}
+                    className="px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-800 hover:bg-slate-100 flex items-center gap-1.5 shadow-xs"
+                  >
+                    <Phone className="w-3.5 h-3.5 text-follo-blue" />
+                    <span>Contatta</span>
+                  </a>
+                </div>
+              )}
+
               {/* Destination Point */}
               <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex items-start gap-3 text-xs">
                 {order.pickup_point ? (
@@ -208,7 +249,7 @@ export default function OrderTrackingPage() {
                   </span>
                   {order.notes && (
                     <div className="mt-1 text-slate-500 italic">
-                      Note: "{order.notes}"
+                      Note: &quot;{order.notes}&quot;
                     </div>
                   )}
                 </div>
@@ -266,19 +307,34 @@ export default function OrderTrackingPage() {
                   Metodo: {order.payment_method === 'CARD' ? 'Carta di Credito (Stripe Auth&Capture)' : `Contanti alla consegna (Resto per €${order.cash_change_from || order.total_order_amount})`}
                 </div>
               </div>
+
+              {/* FolloPoints earned notification */}
+              <div className="p-3 bg-linear-to-r from-amber-50 to-amber-100/50 rounded-2xl border border-amber-200 text-xs flex items-center justify-between">
+                <span className="flex items-center gap-1.5 font-bold text-amber-900">
+                  <Sparkles className="w-4 h-4 text-follo-sand" /> FolloPoints accumulati con questo ordine:
+                </span>
+                <span className="font-black text-amber-900 text-sm">
+                  +{order.follo_points_earned || Math.floor(order.total_food_amount)} Punti
+                </span>
+              </div>
             </div>
 
             {/* Leave a Review section */}
             <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-3">
-              <div className="flex items-center gap-2">
-                <Star className="w-4 h-4 text-follo-sand" />
-                <h3 className="font-bold text-sm text-slate-900">Valuta la tua esperienza</h3>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Star className="w-4 h-4 text-follo-sand" />
+                  <h3 className="font-bold text-sm text-slate-900">Valuta la tua esperienza</h3>
+                </div>
+                <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full">
+                  +10 FolloPoints
+                </span>
               </div>
 
               {reviewSubmitted ? (
                 <div className="p-3 bg-emerald-50 text-emerald-800 rounded-2xl text-xs font-bold flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  <span>Grazie per la tua recensione certificata FolloEat!</span>
+                  <span>Grazie per la tua recensione certificata FolloEat! +10 FolloPoints accreditati!</span>
                 </div>
               ) : (
                 <form onSubmit={handleSendReview} className="space-y-3">
@@ -296,6 +352,18 @@ export default function OrderTrackingPage() {
                       </button>
                     ))}
                   </div>
+
+                  <div className="flex flex-wrap gap-1.5 text-[11px]">
+                    {['Cibo caldissimo', 'Puntualità perfetta', 'Servizio al tavolo', 'Gusto maremmano', 'Rider cortese'].map(b => (
+                      <span
+                        key={b}
+                        className="px-2.5 py-1 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium cursor-pointer border border-slate-200 transition-colors"
+                      >
+                        {b}
+                      </span>
+                    ))}
+                  </div>
+
                   <textarea
                     rows={2}
                     placeholder="Racconta cosa ti è piaciuto della pizza o della consegna..."
@@ -305,13 +373,14 @@ export default function OrderTrackingPage() {
                   />
                   <button
                     type="submit"
-                    className="px-4 py-2 bg-follo-slate hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-colors"
+                    className="px-4 py-2 bg-follo-slate hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-colors shadow-xs"
                   >
-                    Invia Recensione
+                    Invia Recensione (+10 Punti)
                   </button>
                 </form>
               )}
             </div>
+
           </>
         )}
       </main>

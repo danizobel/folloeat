@@ -15,7 +15,7 @@ import {
   Sparkles,
   CheckCircle2
 } from 'lucide-react';
-import { FOLLONICA_ZONES, FOLLONICA_BEACH_CLUBS, SponsoredNotification } from '@/lib/types';
+import { FOLLONICA_ZONES, FOLLONICA_BEACH_CLUBS, FOLLONICA_BEACH_POINTS, SponsoredNotification } from '@/lib/types';
 
 interface HeaderProps {
   selectedZone: string;
@@ -176,11 +176,12 @@ export default function Header({
                   onChange={(e) => setTempLido(e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-follo-blue"
                 >
-                  {FOLLONICA_BEACH_CLUBS.map((club) => (
+                  {FOLLONICA_BEACH_CLUBS.map((club: (typeof FOLLONICA_BEACH_POINTS)[number]) => (
                     <option key={club.id} value={club.name}>
                       {club.name} ({club.zone} - {club.address})
                     </option>
                   ))}
+
                 </select>
               </div>
 

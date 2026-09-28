@@ -48,14 +48,20 @@ export function generateSunmi58mmThermalReceipt(order: Order): string {
 
   // 2. Order Identification
   lines.push(centerText(`ORDINE: ${order.id}`));
+  if (order.delivery_pin) {
+    lines.push(centerText(`PIN CONSEGNA: [ ${order.delivery_pin} ]`));
+  }
   lines.push(centerText(`${formattedDate} - ${formattedTime}`));
   lines.push(divider());
 
   // 3. Customer & Delivery Destination
   lines.push(`CLIENTE: ${order.customer_name}`);
   lines.push(`TEL:     ${order.customer_phone}`);
+  if (order.umbrella_number) {
+    lines.push(`DEST:    *** CONSEGNA OMBRELLONE ***`);
+    lines.push(`OMBRELLONE: N. ${order.umbrella_number}`);
+  }
   if (order.pickup_point) {
-    lines.push(`DEST:    *** OMBRELLONE SPIAGGIA ***`);
     lines.push(`PUNTO:   ${order.pickup_point}`);
   } else if (order.delivery_address) {
     lines.push(`DEST:    ${order.delivery_address}`);
@@ -64,6 +70,7 @@ export function generateSunmi58mmThermalReceipt(order: Order): string {
     lines.push(`ZONA:    ${order.zone}`);
   }
   lines.push(divider());
+
 
   // 4. Cutlery Notice
   if (order.cutlery_requested) {

@@ -18,7 +18,7 @@ import {
   Order,
   Reservation,
   SponsoredNotification,
-  FOLLONICA_ZONES
+  DietaryFilter
 } from '@/lib/types';
 import {
   Search,
@@ -32,11 +32,17 @@ import {
   ShieldAlert,
   Send,
   Building2,
-  HelpCircle,
-  ExternalLink,
   Store,
-  DollarSign,
-  X
+  Phone,
+  RotateCcw,
+  Tag,
+  AlertTriangle,
+  Flame,
+  Leaf,
+  Wheat,
+  Milk,
+  X,
+  Bell
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -48,6 +54,7 @@ export default function HomePage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'cards' | 'map'>('cards');
   const [activeTab, setActiveTab] = useState<NavTab>('home');
+  const [dietaryFilter, setDietaryFilter] = useState<DietaryFilter>('ALL');
 
   // Data
   const [places, setPlaces] = useState<Merchant[]>([]);
@@ -61,16 +68,49 @@ export default function HomePage() {
 
   // Cart & Checkout
   const [cartItems, setCartItems] = useState<OrderItem[]>([]);
+  const [cartMerchant, setCartMerchant] = useState<Merchant | null>(null);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [lastCreatedOrder, setLastCreatedOrder] = useState<Order | null>(null);
+
+  // Multi-Merchant Conflict Modal
+  const [merchantConflict, setMerchantConflict] = useState<{
+    isOpen: boolean;
+    pendingMerchant: Merchant | null;
+    pendingDish?: OrderItem;
+  }>({
+    isOpen: false,
+    pendingMerchant: null
+  });
 
   // Fast Seating Modal
   const [fastSeatingMerchant, setFastSeatingMerchant] = useState<Merchant | null>(null);
   const [isFastSeatingOpen, setIsFastSeatingOpen] = useState(false);
   const [lastReservation, setLastReservation] = useState<Reservation | null>(null);
 
-  // Lead Generation Feedback Toast for Non-Partner Places
+  // In-App Notifications Modal
+  const [isNotifModalOpen, setIsNotifModalOpen] = useState(false);
+
+  // Lead Generation Feedback Toast
   const [signalSuccessMessage, setSignalSuccessMessage] = useState<string | null>(null);
+
+  // 1-Tap "Il Mio Solito" Re-order state
+  const [usualOrder, setUsualOrder] = useState<{
+    merchant: Merchant;
+    items: OrderItem[];
+    dateStr: string;
+  } | null>(null);
+
+  // Load "Il Mio Solito" on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('folloeat_usual_order');
+      if (saved) {
+        setUsualOrder(JSON.parse(saved));
+      }
+    } catch {
+      // Ignored
+    }
+  }, []);
 
   // Fetch places from /api/places/follonica
   const fetchPlaces = async () => {
@@ -100,7 +140,7 @@ export default function HomePage() {
       if (data.success) {
         setNotifications(data.notifications || []);
       }
-    } catch (e) {
+    } catch {
       // Ignored
     }
   };
@@ -113,7 +153,7 @@ export default function HomePage() {
     fetchNotifications();
   }, []);
 
-  // Handle Search Input submit / debounce
+  // Handle Search Input submit
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     fetchPlaces();
@@ -144,8 +184,22 @@ export default function HomePage() {
     }, 5000);
   };
 
-  // Cart operations
+  // Cart operations with Mono-Merchant Enforcement (Master v4.1 Section 1.1)
   const handleAddToCart = (dishItem: OrderItem) => {
+    // If cart has items from another restaurant, open conflict resolution modal
+    if (cartItems.length > 0 && cartMerchant && selectedMerchant && cartMerchant.id !== selectedMerchant.id) {
+      setMerchantConflict({
+        isOpen: true,
+        pendingMerchant: selectedMerchant,
+        pendingDish: dishItem
+      });
+      return;
+    }
+
+    if (!cartMerchant && selectedMerchant) {
+      setCartMerchant(selectedMerchant);
+    }
+
     setCartItems(prev => {
       const idx = prev.findIndex(item => item.id === dishItem.id);
       if (idx > -1) {
@@ -157,9 +211,18 @@ export default function HomePage() {
     });
   };
 
+  const handleResolveConflictSwitch = () => {
+    if (merchantConflict.pendingMerchant && merchantConflict.pendingDish) {
+      setCartMerchant(merchantConflict.pendingMerchant);
+      setCartItems([merchantConflict.pendingDish]);
+    }
+    setMerchantConflict({ isOpen: false, pendingMerchant: null });
+    setIsCartOpen(true);
+  };
+
   const handleUpdateCartQuantity = (id: string, delta: number) => {
     setCartItems(prev => {
-      return prev
+      const updated = prev
         .map(item => {
           if (item.id === id) {
             const nextQty = item.quantity + delta;
@@ -168,11 +231,44 @@ export default function HomePage() {
           return item;
         })
         .filter(Boolean) as OrderItem[];
+
+      if (updated.length === 0) {
+        setCartMerchant(null);
+      }
+      return updated;
     });
   };
 
   const handleClearCart = () => {
     setCartItems([]);
+    setCartMerchant(null);
+  };
+
+  // Re-order "Il Mio Solito"
+  const handleApplyUsualOrder = () => {
+    if (!usualOrder) return;
+    setCartMerchant(usualOrder.merchant);
+    setSelectedMerchant(usualOrder.merchant);
+    setCartItems(usualOrder.items);
+    setIsCartOpen(true);
+  };
+
+  // Save successful order as "Il Mio Solito"
+  const handleOrderSuccess = (order: Order) => {
+    setLastCreatedOrder(order);
+    if (cartMerchant && cartItems.length > 0) {
+      const usualData = {
+        merchant: cartMerchant,
+        items: cartItems,
+        dateStr: new Date().toLocaleDateString('it-IT')
+      };
+      setUsualOrder(usualData);
+      try {
+        localStorage.setItem('folloeat_usual_order', JSON.stringify(usualData));
+      } catch {
+        // Ignored
+      }
+    }
   };
 
   // Fast Seating
@@ -181,8 +277,16 @@ export default function HomePage() {
     setIsFastSeatingOpen(true);
   };
 
+  // Filtered places according to dietary option
+  const filteredPlaces = places.filter(place => {
+    if (dietaryFilter === 'GLUTEN_FREE' && place.has_gluten_free !== 1) return false;
+    if (dietaryFilter === 'VEGAN' && place.has_vegan !== 1) return false;
+    if (dietaryFilter === 'LACTOSE_FREE' && place.has_lactose_free !== 1) return false;
+    return true;
+  });
+
   return (
-    <div className="min-h-screen pb-24 pt-20 px-4 md:px-8 max-w-7xl mx-auto">
+    <div className="min-h-screen pb-24 pt-20 px-4 md:px-8 max-w-7xl mx-auto font-sans">
       {/* Fixed Header */}
       <Header
         selectedZone={selectedZone}
@@ -259,7 +363,7 @@ export default function HomePage() {
               <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200">
                 <span className="font-bold text-follo-blue block mb-1">DIGITAL PLATFORM FEE</span>
                 <p className="text-slate-700 font-semibold text-base mb-1">€0,15 a carico cliente</p>
-                <p className="text-slate-500">"Contributo Digitale & Ristorazione Follonichese" addebitato trasparente al checkout. Costo per il locale: €0,00.</p>
+                <p className="text-slate-500">&quot;Contributo Digitale & Ristorazione Follonichese&quot; addebitato trasparente al checkout. Costo per il locale: €0,00.</p>
               </div>
 
               <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 md:col-span-2">
@@ -276,7 +380,7 @@ export default function HomePage() {
                 Manleva Legale & Qualifica SaaS
               </div>
               <p className="leading-relaxed">
-                FolloEat opera esclusivamente quale fornitore tecnologico SaaS e declina ogni responsabilità (manleva totale al 100%) per logistica dell'esercente, contratti e sicurezza rider, infortuni INAIL, codice della strada e igiene alimentare HACCP (catena del caldo/freddo).
+                FolloEat opera esclusivamente quale fornitore tecnologico SaaS e declina ogni responsabilità (manleva totale al 100%) per logistica dell&apos;esercente, contratti e sicurezza rider, infortuni INAIL, codice della strada e igiene alimentare HACCP (catena del caldo/freddo).
               </p>
             </div>
 
@@ -301,18 +405,18 @@ export default function HomePage() {
       ) : activeTab === 'tables' ? (
         /* Tab Content 2: RADAR TAVOLI DEDICATED VIEW */
         <div className="space-y-6 animate-in fade-in">
-          <div className="bg-gradient-to-r from-amber-500 to-amber-600 rounded-3xl p-6 text-white shadow-md">
+          <div className="bg-linear-to-r from-amber-500 to-amber-600 rounded-3xl p-6 text-white shadow-md">
             <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-amber-100 mb-1">
               <Sparkles className="w-4 h-4" /> Radar Tavoli Follonica
             </div>
             <h2 className="text-2xl font-black">Coperti Last-Minute • 2° Turno (Post-21:30)</h2>
             <p className="text-xs text-amber-100 mt-1 max-w-xl">
-              Prenota all'istante i tavoli liberati nei migliori ristoranti del litorale con prenotazione confermata a soli €0,50 a persona.
+              Prenota all&apos;istante i tavoli liberati nei migliori ristoranti del litorale con prenotazione confermata a soli €0,50 a persona.
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {places.filter(p => p.is_partner === 1).map(p => (
+            {places.filter(p => p.is_accredited === 1 || p.is_partner === 1).map(p => (
               <div
                 key={p.id}
                 className="bg-white rounded-3xl p-5 border border-slate-200 shadow-xs hover:border-follo-sand transition-all space-y-3"
@@ -345,16 +449,21 @@ export default function HomePage() {
         /* Tab Content 3: HOME / DISCOVERY / MAPPA */
         <div className="space-y-6">
           {/* Hero Banner with delivery guarantee and beach order */}
-          <div className="relative overflow-hidden bg-gradient-to-r from-sky-600 via-sky-700 to-follo-blue rounded-3xl p-6 md:p-8 text-white shadow-lg">
+          <div className="relative overflow-hidden bg-linear-to-r from-sky-600 via-sky-700 to-follo-blue rounded-3xl p-6 md:p-8 text-white shadow-lg">
             <div className="relative z-10 max-w-2xl">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 backdrop-blur-md text-[11px] font-bold tracking-wide uppercase mb-3">
-                <Sparkles className="w-3.5 h-3.5 text-follo-sand" /> Piattaforma Etica Iperlocale
-              </span>
+              <div className="flex flex-wrap items-center gap-2 mb-3">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 backdrop-blur-md text-[11px] font-bold tracking-wide uppercase">
+                  <Sparkles className="w-3.5 h-3.5 text-follo-sand" /> Piattaforma Etica Iperlocale
+                </span>
+                <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-follo-red/90 text-white text-[11px] font-black tracking-wide">
+                  <Tag className="w-3 h-3" /> Coupon FOLLO5: -5%
+                </span>
+              </div>
               <h1 className="text-2xl md:text-4xl font-black tracking-tight leading-tight">
-                Il vero cibo di Follonica, a casa tua o sotto l'ombrellone.
+                Il vero cibo di Follonica, a casa tua o sotto l&apos;ombrellone.
               </h1>
               <p className="text-xs md:text-sm text-sky-100 mt-2 leading-relaxed">
-                Tuteliamo i margini dei ristoratori follonichesi con commissioni all'8% e incassi diretti. Consegna garantita in tutto il golfo.
+                Tuteliamo i margini dei ristoratori follonichesi con commissioni all&apos;8% e incassi diretti. Consegna garantita nei quartieri e agli stabilimenti balneari del golfo.
               </p>
 
               {/* Search Bar */}
@@ -363,7 +472,7 @@ export default function HomePage() {
                   <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
-                    placeholder="Cerca pizza, burger di Chianina, pesce fresco..."
+                    placeholder="Cerca pizza verace, smash burger di Chianina, pesce fresco..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-white text-slate-900 text-xs md:text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-white shadow-md"
@@ -382,12 +491,88 @@ export default function HomePage() {
             <div className="absolute -right-12 -bottom-12 w-64 h-64 rounded-full bg-white/10 blur-2xl pointer-events-none"></div>
           </div>
 
+          {/* 1-Tap "Il Mio Solito" Quick Re-order Bar (if previous order exists) */}
+          {usualOrder && (
+            <div className="p-4 rounded-2xl bg-linear-to-r from-amber-50 to-orange-50 border border-amber-200/90 shadow-xs flex items-center justify-between gap-4 animate-in fade-in">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center text-lg shrink-0 shadow-xs">
+                  <RotateCcw className="w-5 h-5" />
+                </div>
+                <div>
+                  <span className="text-[11px] font-black uppercase text-amber-800 tracking-wider block">
+                    Riordina &quot;Il Mio Solito&quot; a 1-Tap
+                  </span>
+                  <p className="text-xs text-slate-700 font-medium">
+                    Da <strong>{usualOrder.merchant.name}</strong> • {usualOrder.items.map(i => `${i.quantity}x ${i.name}`).join(', ')}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={handleApplyUsualOrder}
+                className="px-4 py-2 rounded-xl bg-follo-red hover:bg-follo-red-dark text-white text-xs font-black shadow-md shrink-0 flex items-center gap-1.5 transition-all"
+              >
+                <span>Ordina Ora</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
+          {/* Dietary Filters Bar (Master v4.1 Section 4) */}
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-bold text-slate-500 mr-1 flex items-center gap-1">
+              Filtri:
+            </span>
+            <button
+              onClick={() => setDietaryFilter('ALL')}
+              className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all ${
+                dietaryFilter === 'ALL'
+                  ? 'bg-follo-slate text-white shadow-xs'
+                  : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              Tutti ({places.length})
+            </button>
+            <button
+              onClick={() => setDietaryFilter('GLUTEN_FREE')}
+              className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 ${
+                dietaryFilter === 'GLUTEN_FREE'
+                  ? 'bg-amber-600 text-white shadow-xs'
+                  : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              <Wheat className="w-3.5 h-3.5 text-amber-500" />
+              <span>Senza Glutine</span>
+            </button>
+            <button
+              onClick={() => setDietaryFilter('VEGAN')}
+              className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 ${
+                dietaryFilter === 'VEGAN'
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              <Leaf className="w-3.5 h-3.5 text-emerald-500" />
+              <span>Vegano & Vegetariano</span>
+            </button>
+            <button
+              onClick={() => setDietaryFilter('LACTOSE_FREE')}
+              className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 ${
+                dietaryFilter === 'LACTOSE_FREE'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              <Milk className="w-3.5 h-3.5 text-blue-500" />
+              <span>Senza Lattosio</span>
+            </button>
+          </div>
+
           {/* Controls Bar: View Switch (Cards vs Map) & Results Count */}
           <div className="flex items-center justify-between gap-4">
             <div className="text-xs font-bold text-slate-700">
-              Locali trovati a Follonica: <span className="text-follo-blue font-black">{places.length}</span>
+              Locali a Follonica: <span className="text-follo-blue font-black">{filteredPlaces.length}</span>
               {selectedZone !== 'TUTTI' && (
-                <span className="text-slate-500 font-normal"> (Filtro: {selectedZone})</span>
+                <span className="text-slate-500 font-normal"> (Zona: {selectedZone})</span>
               )}
             </div>
 
@@ -420,27 +605,30 @@ export default function HomePage() {
 
           {/* VIEW: INTERACTIVE LEAFLET MAP */}
           {viewMode === 'map' ? (
-            <div className="h-[520px] w-full animate-in fade-in">
+            <div className="h-[520px] w-full animate-in fade-in rounded-3xl overflow-hidden border border-slate-200 shadow-sm">
               <InteractiveMap
-                places={places}
+                places={filteredPlaces}
                 selectedPlace={selectedMerchant}
                 onSelectPlace={handleOpenMenu}
                 onSignalPlace={handleSignalPlace}
               />
             </div>
           ) : (
-            /* VIEW: CARDS LIST */
+            /* VIEW: CARDS LIST (3-TIER VISIBILITY) */
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-              {places.map((place) => {
-                const isPartner = place.is_partner === 1;
+              {filteredPlaces.map((place) => {
+                const isSpotlight = place.is_spotlight === 1;
+                const isAccredited = place.is_accredited === 1 || place.is_partner === 1;
 
                 return (
                   <div
                     key={place.id}
                     className={`rounded-3xl overflow-hidden bg-white border transition-all duration-200 flex flex-col justify-between shadow-xs hover:shadow-md ${
-                      isPartner
+                      isSpotlight
+                        ? 'border-2 border-amber-400 bg-linear-to-b from-amber-50/30 to-white shadow-amber-500/10'
+                        : isAccredited
                         ? 'border-slate-200 hover:border-follo-blue'
-                        : 'border-slate-200/80 bg-slate-50/50'
+                        : 'border-slate-200/80 bg-slate-50/60'
                     }`}
                   >
                     <div>
@@ -458,15 +646,19 @@ export default function HomePage() {
                           </div>
                         )}
 
-                        {/* Top Badges */}
-                        <div className="absolute top-3 left-3 flex items-center gap-2">
-                          {isPartner ? (
+                        {/* Top Badges (3 Tiers) */}
+                        <div className="absolute top-3 left-3 flex items-center gap-1.5 flex-wrap">
+                          {isSpotlight ? (
+                            <span className="px-2.5 py-1 rounded-full bg-linear-to-r from-amber-500 to-amber-600 text-white text-[10px] font-black tracking-wider uppercase shadow-md flex items-center gap-1">
+                              👑 Sponsorizzato
+                            </span>
+                          ) : isAccredited ? (
                             <span className="px-2.5 py-1 rounded-full bg-follo-blue text-white text-[10px] font-black tracking-wider uppercase shadow-md flex items-center gap-1">
-                              <CheckCircle2 className="w-3 h-3" /> Partner Ufficiale
+                              <CheckCircle2 className="w-3 h-3" /> Consigliato FolloEat
                             </span>
                           ) : (
                             <span className="px-2.5 py-1 rounded-full bg-slate-800/80 backdrop-blur-xs text-white text-[10px] font-bold uppercase tracking-wider">
-                              Locale Censito
+                              Directory Diretta
                             </span>
                           )}
                         </div>
@@ -497,26 +689,47 @@ export default function HomePage() {
                           {place.address}
                         </p>
 
-                        {/* If Partner: show delivery meta & preview */}
-                        {isPartner ? (
+                        {/* Dietary Option Tags */}
+                        {isAccredited && (
+                          <div className="flex flex-wrap gap-1 mt-2.5">
+                            {place.has_gluten_free === 1 && (
+                              <span className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 text-[10px] font-bold border border-amber-200">
+                                🌾 Gluten Free
+                              </span>
+                            )}
+                            {place.has_vegan === 1 && (
+                              <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 text-[10px] font-bold border border-emerald-200">
+                                🌱 Vegano
+                              </span>
+                            )}
+                            {place.has_lactose_free === 1 && (
+                              <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-800 text-[10px] font-bold border border-blue-200">
+                                🥛 Senza Lattosio
+                              </span>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Delivery Meta or Directory note */}
+                        {isAccredited ? (
                           <div className="flex items-center gap-3 mt-3 pt-3 border-t border-slate-100 text-xs text-slate-600">
                             <span className="flex items-center gap-1">
                               <Clock className="w-3.5 h-3.5 text-slate-400" /> {place.delivery_time_est || '25-35 min'}
                             </span>
                             <span>•</span>
-                            <span>Min. €{place.min_order?.toFixed(2) || '10.00'}</span>
+                            <span>Min. €{place.min_order?.toFixed(2) || '12.00'}</span>
                           </div>
                         ) : (
                           <div className="mt-3 pt-3 border-t border-slate-200/60 text-[11px] text-slate-500 leading-relaxed">
-                            Attività reale sul territorio. Non ancora abilitata agli ordini diretti con terminale Sunmi.
+                            Scheda informativa a titolo gratuito. Chiama direttamente per ordinare al telefono o prenotare.
                           </div>
                         )}
                       </div>
                     </div>
 
-                    {/* Bottom CTA Action */}
+                    {/* Bottom CTA Action (Level-specific) */}
                     <div className="p-5 pt-0">
-                      {isPartner ? (
+                      {isAccredited ? (
                         <div className="flex gap-2">
                           <button
                             onClick={() => handleOpenMenu(place)}
@@ -534,13 +747,21 @@ export default function HomePage() {
                           </button>
                         </div>
                       ) : (
-                        <button
-                          onClick={() => handleSignalPlace(place)}
-                          className="w-full py-2.5 px-3 rounded-2xl bg-slate-100 hover:bg-slate-200/80 text-slate-700 font-bold text-xs border border-slate-200 transition-colors flex items-center justify-center gap-1.5"
-                        >
-                          <Send className="w-3.5 h-3.5 text-follo-red" />
-                          <span>Segnala a questo locale di attivarsi</span>
-                        </button>
+                        <div className="space-y-2">
+                          <a
+                            href={`tel:${place.phone}`}
+                            className="w-full py-2.5 px-3 rounded-2xl bg-follo-slate hover:bg-slate-800 text-white font-bold text-xs shadow-xs transition-colors flex items-center justify-center gap-2"
+                          >
+                            <Phone className="w-3.5 h-3.5 text-follo-sand" />
+                            <span>Chiama Locale ({place.phone})</span>
+                          </a>
+                          <button
+                            onClick={() => handleSignalPlace(place)}
+                            className="w-full py-1.5 px-3 text-[11px] text-slate-500 hover:text-slate-700 font-medium transition-colors text-center block"
+                          >
+                            Segnala a FolloEat di attivare gli ordini online
+                          </button>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -576,73 +797,69 @@ export default function HomePage() {
         isOpen={isCartOpen}
         onClose={() => setIsCartOpen(false)}
         items={cartItems}
-        merchantId={selectedMerchant?.id || places[0]?.id || ''}
-        merchantName={selectedMerchant?.name || 'Locale FolloEat'}
+        merchantId={cartMerchant?.id || selectedMerchant?.id || places[0]?.id || ''}
+        merchantName={cartMerchant?.name || selectedMerchant?.name || 'Locale FolloEat'}
         zone={selectedZone}
         pickupPoint={selectedZone === 'Spiaggia' ? `${selectedLido} ${umbrellaRef ? `(#${umbrellaRef})` : ''}` : undefined}
         onUpdateQuantity={handleUpdateCartQuantity}
         onClearCart={handleClearCart}
-        onOrderSuccess={(order) => {
-          setLastCreatedOrder(order);
-        }}
+        onOrderSuccess={handleOrderSuccess}
       />
 
       {/* Fast Seating Radar Tavoli Modal */}
-      <FastSeatingModal
-        isOpen={isFastSeatingOpen}
-        onClose={() => setIsFastSeatingOpen(false)}
-        merchant={fastSeatingMerchant}
-        onSuccess={(res) => {
-          setLastReservation(res);
-        }}
-      />
+      {isFastSeatingOpen && fastSeatingMerchant && (
+        <FastSeatingModal
+          isOpen={isFastSeatingOpen}
+          onClose={() => setIsFastSeatingOpen(false)}
+          merchant={fastSeatingMerchant}
+          onSuccess={(res: Reservation) => {
+            setLastReservation(res);
+          }}
+        />
+      )}
 
-      {/* Order Confirmation Banner Toast */}
-      {lastCreatedOrder && (
-        <div className="fixed bottom-20 left-4 right-4 md:left-auto md:right-8 md:max-w-md z-40 bg-slate-900 text-white p-4 rounded-3xl shadow-2xl border border-slate-800 animate-in slide-in-from-bottom-5">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-center gap-2.5">
-              <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
-                <CheckCircle2 className="w-6 h-6" />
-              </div>
-              <div>
-                <span className="text-[10px] font-bold uppercase text-emerald-400">Ordine Inviato con Successo</span>
-                <h4 className="font-bold text-sm text-white">{lastCreatedOrder.id}</h4>
-              </div>
+      {/* Multi-Merchant Conflict Resolution Modal (Section 1.1 Mono-Merchant Rule) */}
+      {merchantConflict.isOpen && merchantConflict.pendingMerchant && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-amber-200 space-y-4">
+            <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center text-2xl">
+              <Store className="w-6 h-6" />
             </div>
-            <button
-              onClick={() => setLastCreatedOrder(null)}
-              className="text-slate-400 hover:text-white"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-          <p className="text-xs text-slate-300 mt-2">
-            La comanda è stata trasmessa al terminale Sunmi del ristorante. Totale: €{lastCreatedOrder.total_order_amount.toFixed(2)} ({lastCreatedOrder.payment_method === 'CARD' ? 'Carta pre-autorizzata' : 'Contanti alla consegna'}).
-          </p>
-          <div className="mt-3 pt-3 border-t border-slate-800 flex items-center justify-between">
-            <Link
-              href={`/order/${lastCreatedOrder.id}`}
-              className="w-full py-2 rounded-xl bg-follo-blue hover:bg-follo-blue-dark text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors shadow-sm"
-            >
-              <span>Apri Tracciamento Ordine Live</span>
-              <ChevronRight className="w-3.5 h-3.5" />
-            </Link>
+            <div>
+              <h3 className="text-base font-black text-slate-900">
+                Cambio Ristorante nel Carrello
+              </h3>
+              <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                A tutela dei ristoratori locali, ogni ristorante su FolloEat ha un conto merchant autonomo e una cassa dedicata.
+                Nel carrello hai già piatti di <strong>{cartMerchant?.name}</strong>.
+              </p>
+            </div>
+            <div className="space-y-2 pt-2">
+              <button
+                onClick={handleResolveConflictSwitch}
+                className="w-full py-2.5 px-4 rounded-xl bg-follo-blue hover:bg-follo-blue-dark text-white text-xs font-bold transition-colors shadow-xs"
+              >
+                Svuota carrello e ordina da {merchantConflict.pendingMerchant.name}
+              </button>
+              <button
+                onClick={() => setMerchantConflict({ isOpen: false, pendingMerchant: null })}
+                className="w-full py-2.5 px-4 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold hover:bg-slate-50 transition-colors"
+              >
+                Mantieni carrello attuale ({cartMerchant?.name})
+              </button>
+            </div>
           </div>
         </div>
       )}
 
-      {/* Fixed Bottom Dock Nav */}
+      {/* Bottom Floating Dock Navigation */}
       <BottomDockNav
         activeTab={activeTab}
-        onTabChange={(t) => {
-          setActiveTab(t);
-          if (t === 'home') setViewMode('cards');
-          if (t === 'search') setViewMode('map');
-        }}
-        cartCount={cartItems.reduce((sum, i) => sum + i.quantity, 0)}
+        onTabChange={setActiveTab}
+        cartCount={cartItems.reduce((sum, item) => sum + item.quantity, 0)}
         onOpenCart={() => setIsCartOpen(true)}
       />
+
     </div>
   );
 }
