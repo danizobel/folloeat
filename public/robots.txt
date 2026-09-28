@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /merchant/
+
+Sitemap: https://folloeat.it/sitemap.xml
