@@ -7,6 +7,7 @@ import MenuDrawer from '@/components/MenuDrawer';
 import CartCheckoutModal from '@/components/CartCheckoutModal';
 import FastSeatingModal from '@/components/FastSeatingModal';
 import BottomDockNav, { NavTab } from '@/components/BottomDockNav';
+import Footer from '@/components/Footer';
 import Logo from '@/components/Logo';
 import {
   Merchant,
@@ -547,6 +548,9 @@ export default function HomePage() {
           )}
         </div>
       )}
+
+      {/* Territorial & Legal Footer */}
+      <Footer />
 
       {/* Menu Drawer Modal */}
       {isMenuOpen && selectedMerchant && (

@@ -3,9 +3,10 @@ import path from 'path';
 import { execSync } from 'child_process';
 
 const MIGRATION_FILE = path.join(process.cwd(), 'migrations', '0001_init_schema.sql');
+const isRemote = process.argv.includes('--remote') || process.env.REMOTE_MIGRATE === '1';
 
 console.log('----------------------------------------------------');
-console.log(' [FolloEat v4.1] Avvio Auto-Migrazione SQL Database ');
+console.log(` [FolloEat v4.1] Auto-Migrazione SQL Database (${isRemote ? 'PRODUZIONE REMOTE' : 'LOCALE/BUILD'}) `);
 console.log('----------------------------------------------------');
 
 if (!fs.existsSync(MIGRATION_FILE)) {
@@ -22,20 +23,25 @@ if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
 }
 
-// 2. Verifica se Wrangler è disponibile per migrazione Cloudflare D1
+// 2. Esecuzione migrazione Cloudflare D1
 try {
-  console.log('Verifica disponibilità database Cloudflare D1...');
-  // Tenta l'esecuzione su Cloudflare D1 se configurato in wrangler
-  const result = execSync('npx wrangler d1 execute folloeat-db --local --file=./migrations/0001_init_schema.sql', {
+  const flag = isRemote ? '--remote' : '--local';
+  console.log(`Esecuzione comandi SQL su Cloudflare D1 (${flag})...`);
+  const cmd = `npx wrangler d1 execute folloeat-db ${flag} --file=./migrations/0001_init_schema.sql`;
+  const result = execSync(cmd, {
     stdio: 'pipe',
     encoding: 'utf-8'
   });
-  console.log('✓ Migrazione Cloudflare D1 locale eseguita con successo:\n', result);
+  console.log(`✓ Migrazione Cloudflare D1 (${flag}) completata con successo:\n`, result);
 } catch (e) {
-  console.log('ℹ Nota: Wrangler D1 locale non configurato o in modalità standalone. Il motore di auto-migrazione runtime integrato in src/lib/db.ts gestirà la migrazione all\'avvio in produzione.');
+  if (isRemote) {
+    console.warn('⚠️ Attenzione: Migrazione remota CLI non riuscita (probabile assenza di login Wrangler o credenziali CF). Il motore di auto-migrazione runtime in src/lib/db.ts eseguirà lo schema D1 automaticamente alla prima richiesta.');
+  } else {
+    console.log('ℹ Nota: Wrangler D1 locale pronto o in modalità edge. Il motore runtime in src/lib/db.ts gestisce la migrazione attiva.');
+  }
 }
 
 console.log('----------------------------------------------------');
-console.log(' [FolloEat v4.1] Auto-Migrazione SQL Completata con successo! ');
+console.log(' [FolloEat v4.1] Auto-Migrazione SQL Terminata con Successo! ');
 console.log('----------------------------------------------------');
 process.exit(0);

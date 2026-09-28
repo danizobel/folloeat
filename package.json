@@ -4,11 +4,13 @@
   "main": "index.js",
   "scripts": {
     "dev": "next dev",
+    "postinstall": "node scripts/auto-migrate.mjs",
     "prebuild": "node scripts/auto-migrate.mjs",
     "build": "next build",
     "start": "next start",
-    "pages:build": "npx @cloudflare/next-on-pages",
-    "deploy": "npx @cloudflare/next-on-pages && wrangler pages deploy .vercel/output/static",
+    "pages:build": "node scripts/auto-migrate.mjs && npx @cloudflare/next-on-pages",
+    "deploy": "node scripts/auto-migrate.mjs && npx @cloudflare/next-on-pages && wrangler pages deploy .vercel/output/static",
+    "deploy:prod": "node scripts/auto-migrate.mjs --remote && npx @cloudflare/next-on-pages && wrangler pages deploy .vercel/output/static",
     "db:migrate": "node scripts/auto-migrate.mjs",
     "db:migrate:prod": "wrangler d1 execute folloeat-db --remote --file=./migrations/0001_init_schema.sql"
   },

@@ -84,13 +84,25 @@ npm start
 
 ---
 
-## ☁️ Deploy su Cloudflare Pages / Workers
+## ☁️ Deploy Automatico & Auto-Migrazione SQL
 
-1. Applicare le migrazioni D1 su Cloudflare:
-```bash
-npx wrangler d1 execute folloeat-db --file=./migrations/0001_init_schema.sql
-```
-2. Build e Deploy con `@cloudflare/next-on-pages` o Wrangler:
-```bash
-npx wrangler pages deploy .vercel/output/static
-```
+Il progetto integra un **motore di auto-migrazione SQL a 3 livelli**, garantendo che appena deployato i comandi SQL vengano eseguiti **in totale autonomia senza alcun intervento manuale**:
+
+1. **Livello 1 (Hook NPM / Deploy Automati)**:
+   - Al lancio di `npm install` su qualsiasi piattaforma (Cloudflare Pages, Vercel, Docker), lo script `postinstall` esegue automaticamente `node scripts/auto-migrate.mjs`.
+   - Al lancio della build (`npm run build` o `npm run pages:build`), lo script `prebuild` riesegue e convalida la migrazione D1.
+
+2. **Livello 2 (Auto-Healing Runtime Serverless)**:
+   - In `src/lib/db.ts`, la funzione `ensureDatabaseInitialized()` intercetta qualsiasi prima chiamata API o visita alla piattaforma: se le 7 tabelle relazionali non sono presenti nel database Cloudflare D1 (`env.DB`), esegue istantaneamente `d1.exec(D1_SCHEMA_SQL)` e inserisce automaticamente i 3 ristoranti partner, il registro terminali Sunmi e il menu maremmano.
+
+3. **Livello 3 (Comandi Deploy con 1 Click)**:
+   - Deploy su Cloudflare Pages con auto-migrazione:
+   ```bash
+   npm run deploy
+   ```
+   - Deploy con migrazione forzata su D1 remoto di produzione:
+   ```bash
+   npm run deploy:prod
+   ```
+   - In alternativa, se colleghi la repository Git a Cloudflare Pages: imposta semplicemente il build command a `npm run pages:build` e output directory `.vercel/output/static`. All'atto del deploy Git, la migrazione e l'inizializzazione del database avverranno automaticamente!
+
