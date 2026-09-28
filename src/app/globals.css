@@ -1,3 +1,4 @@
+@import "leaflet/dist/leaflet.css";
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -5,7 +6,9 @@
 @layer base {
   :root {
     --follo-blue: #0284C7;
+    --follo-blue-dark: #0369A1;
     --follo-red: #EF4444;
+    --follo-red-dark: #DC2626;
     --follo-slate: #0F172A;
     --follo-sand: #F59E0B;
     --follo-bg: #F8FAFC;
@@ -37,27 +40,34 @@
 }
 
 /* Leaflet Map Custom Marker & Popup Styles */
+.leaflet-container {
+  width: 100% !important;
+  height: 100% !important;
+  z-index: 1;
+  font-family: inherit;
+}
+
 .follo-marker-pin {
-  width: 34px;
-  height: 34px;
+  width: 36px;
+  height: 36px;
   border-radius: 50% 50% 50% 0;
   position: absolute;
   transform: rotate(-45deg);
   left: 50%;
   top: 50%;
-  margin: -17px 0 0 -17px;
+  margin: -18px 0 0 -18px;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
-  border: 2px solid #ffffff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  border: 2.5px solid #ffffff;
 }
 
 .follo-marker-pin::after {
   content: '';
-  width: 14px;
-  height: 14px;
-  margin: 7px 0 0 7px;
+  width: 12px;
+  height: 12px;
+  margin: 6px 0 0 6px;
   background: #ffffff;
   position: absolute;
   border-radius: 50%;
@@ -69,6 +79,23 @@
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+/* Clean Leaflet Popup Customization */
+.leaflet-popup-content-wrapper {
+  border-radius: 18px !important;
+  padding: 4px !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
+  border: 1px solid #e2e8f0 !important;
+}
+
+.leaflet-popup-content {
+  margin: 12px 14px !important;
+  line-height: 1.4 !important;
+}
+
+.leaflet-popup-tip {
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15) !important;
 }
 
 /* Animation utilities */
@@ -85,3 +112,4 @@
 .font-thermal {
   font-family: 'Courier New', Courier, monospace;
 }
+

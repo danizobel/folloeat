@@ -1,0 +1,5 @@
+{
+  "name": "FolloEat",
+  "description": "Piattaforma etica iperlocale per Follonica e il litorale maremmano. Food delivery, asporto e prenotazione rapida tavoli con terminale Sunmi e incassi diretti ai ristoratori.",
+  "capabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

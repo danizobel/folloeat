@@ -211,3 +211,16 @@ export const FOLLONICA_BEACH_POINTS = [
 
 export const FOLLONICA_BEACH_CLUBS = FOLLONICA_BEACH_POINTS;
 
+export interface UserProfile {
+  id: string;
+  name: string;
+  phone: string;
+  email?: string;
+  address: string;
+  zone: string;
+  umbrella_ref?: string;
+  points: number;
+  favorite_places: string[];
+  registered_at: string;
+}
+

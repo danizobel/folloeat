@@ -13,9 +13,13 @@ import {
   X,
   ChevronDown,
   Sparkles,
-  CheckCircle2
+  CheckCircle2,
+  User,
+  ShoppingBag,
+  Building2,
+  LogIn
 } from 'lucide-react';
-import { FOLLONICA_ZONES, FOLLONICA_BEACH_CLUBS, FOLLONICA_BEACH_POINTS, SponsoredNotification } from '@/lib/types';
+import { FOLLONICA_ZONES, FOLLONICA_BEACH_CLUBS, FOLLONICA_BEACH_POINTS, SponsoredNotification, UserProfile } from '@/lib/types';
 
 interface HeaderProps {
   selectedZone: string;
@@ -23,6 +27,11 @@ interface HeaderProps {
   selectedLido?: string;
   onSelectLido?: (lido: string, umbrellaNumber: string) => void;
   notifications: SponsoredNotification[];
+  user?: UserProfile | null;
+  onOpenAuth?: () => void;
+  onOpenProfile?: () => void;
+  cartCount?: number;
+  onOpenCart?: () => void;
 }
 
 export default function Header({
@@ -30,7 +39,12 @@ export default function Header({
   onSelectZone,
   selectedLido,
   onSelectLido,
-  notifications
+  notifications,
+  user,
+  onOpenAuth,
+  onOpenProfile,
+  cartCount = 0,
+  onOpenCart
 }: HeaderProps) {
   const [showBeachModal, setShowBeachModal] = useState(false);
   const [showNotifDrawer, setShowNotifDrawer] = useState(false);
@@ -59,29 +73,29 @@ export default function Header({
 
   return (
     <>
-      <header className="fixed top-0 left-0 right-0 h-16 bg-white/95 backdrop-blur-md border-b border-slate-200/80 z-40 px-4 md:px-8 flex items-center justify-between shadow-xs">
-        {/* Brand Logo */}
+      <header className="fixed top-0 left-0 right-0 h-16 bg-white/95 backdrop-blur-md border-b border-slate-200/90 z-40 px-4 md:px-8 flex items-center justify-between shadow-xs">
+        {/* Zone 1: Brand Wordmark */}
         <div className="flex items-center gap-3">
           <Link href="/" className="flex items-baseline group hover:opacity-90 transition-opacity">
             <Logo className="text-2xl md:text-3xl" />
           </Link>
-          <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-semibold text-follo-blue bg-follo-blue-light/70 px-2 py-0.5 rounded-full border border-follo-blue/20">
-            Follonica v4.1
+          <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-full border border-slate-200">
+            Follonica 58022
           </span>
         </div>
 
-        {/* Zone & Beach Selector Dropdown */}
+        {/* Zone 2: Territorial Zone & Beach Selector Dropdown */}
         <div className="relative">
           <button
             onClick={() => setZoneDropdownOpen(!zoneDropdownOpen)}
-            className="flex items-center gap-1.5 md:gap-2 px-3 py-1.5 rounded-full bg-slate-100 hover:bg-slate-200/70 border border-slate-200 transition-colors text-xs md:text-sm font-semibold text-slate-800"
+            className="flex items-center gap-1.5 md:gap-2 px-3.5 py-1.5 rounded-full bg-slate-100 hover:bg-slate-200/80 border border-slate-200 transition-colors text-xs md:text-sm font-semibold text-slate-800"
           >
             {activeZoneObj.id === 'Spiaggia' ? (
               <Umbrella className="w-4 h-4 text-follo-blue animate-bounce" />
             ) : (
               <MapPin className="w-4 h-4 text-follo-red" />
             )}
-            <span className="max-w-[130px] md:max-w-[190px] truncate">
+            <span className="max-w-[130px] md:max-w-[200px] truncate">
               {activeZoneObj.id === 'Spiaggia' && selectedLido
                 ? `${selectedLido} ${umbrellaNum ? `(#${umbrellaNum})` : ''}`
                 : activeZoneObj.name}
@@ -90,16 +104,16 @@ export default function Header({
           </button>
 
           {zoneDropdownOpen && (
-            <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 md:left-0 md:translate-x-0 w-64 bg-white rounded-2xl shadow-2xl border border-slate-200/90 py-2 z-50 animate-in fade-in slide-in-from-top-2">
-              <div className="px-3 py-1 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                Seleziona Zona o Spiaggia
+            <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 md:left-0 md:translate-x-0 w-72 bg-white rounded-2xl shadow-2xl border border-slate-200/90 py-2 z-50 animate-in fade-in slide-in-from-top-2">
+              <div className="px-3.5 py-1 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                Seleziona Quartiere o Spiaggia
               </div>
               {FOLLONICA_ZONES.map(z => (
                 <button
                   key={z.id}
                   onClick={() => handleZoneChange(z.id)}
                   className={`w-full text-left px-3.5 py-2 text-xs md:text-sm flex items-center justify-between hover:bg-slate-50 transition-colors ${
-                    selectedZone === z.id ? 'text-follo-blue font-bold bg-follo-blue-light/30' : 'text-slate-700'
+                    selectedZone === z.id ? 'text-follo-blue font-bold bg-sky-50/70' : 'text-slate-700'
                   }`}
                 >
                   <span className="flex items-center gap-2">
@@ -112,7 +126,7 @@ export default function Header({
           )}
         </div>
 
-        {/* Right Actions: Notifications, Terminal link, Admin Link */}
+        {/* Zone 3: Primary Actions (Real Accedi Button / Profile, Cart, Notifications, Admin) */}
         <div className="flex items-center gap-2 md:gap-3">
           {/* Notifications Button */}
           <button
@@ -126,32 +140,67 @@ export default function Header({
             )}
           </button>
 
-          {/* Quick links to Ristoratore Terminal & Admin */}
-          <Link
-            href="/merchant/pizzeria-da-michele"
-            className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-700 hover:text-follo-blue hover:bg-slate-100 transition-colors border border-slate-200"
-          >
-            <Store className="w-3.5 h-3.5 text-follo-blue" />
-            <span>Terminale Sunmi</span>
-          </Link>
+          {/* Cart Quick Button (Desktop & Tablet) */}
+          {onOpenCart && (
+            <button
+              onClick={onOpenCart}
+              className="relative p-2 rounded-full hover:bg-slate-100 text-slate-700 transition-colors hidden sm:flex items-center justify-center"
+              title="Carrello"
+            >
+              <ShoppingBag className="w-5 h-5" />
+              {cartCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-follo-red text-white text-[10px] font-black w-4 h-4 rounded-full flex items-center justify-center ring-2 ring-white">
+                  {cartCount}
+                </span>
+              )}
+            </button>
+          )}
 
+          {/* REAL ACCEDI / USER PROFILE BUTTON */}
+          {user ? (
+            <button
+              onClick={onOpenProfile}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-sky-50 hover:bg-sky-100/80 border border-sky-200 text-xs font-bold text-follo-blue transition-colors shadow-xs"
+              title="Il Mio Profilo"
+            >
+              <div className="w-6 h-6 rounded-full bg-follo-blue text-white flex items-center justify-center text-xs font-black">
+                {user.name.charAt(0).toUpperCase()}
+              </div>
+              <span className="max-w-[100px] truncate hidden md:inline">{user.name}</span>
+              <span className="text-[10px] text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-md font-extrabold hidden sm:inline">
+                {user.points} pt
+              </span>
+            </button>
+          ) : (
+            <button
+              onClick={onOpenAuth}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-follo-blue hover:bg-follo-blue-dark text-white text-xs font-bold transition-all shadow-sm"
+              title="Accedi o Registrati"
+            >
+              <LogIn className="w-4 h-4" />
+              <span>Accedi</span>
+            </button>
+          )}
+
+          {/* Quick link to SuperAdmin */}
           <Link
             href="/admin"
-            className="hidden sm:flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-follo-slate text-white hover:bg-slate-800 transition-colors shadow-xs"
+            className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-follo-slate text-white hover:bg-slate-800 transition-colors shadow-xs"
+            title="Master Console SuperAdmin (PIN 58022)"
           >
             <ShieldCheck className="w-3.5 h-3.5 text-follo-sand" />
-            <span>Admin</span>
+            <span>SuperAdmin</span>
           </Link>
         </div>
       </header>
 
       {/* Sotto l'Ombrellone Beach Selector Modal */}
       {showBeachModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 relative">
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 md:p-7 shadow-2xl border border-slate-100 relative">
             <button
               onClick={() => setShowBeachModal(false)}
-              className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-700 rounded-full"
+              className="absolute top-5 right-5 p-2 text-slate-400 hover:text-slate-700 rounded-full"
             >
               <X className="w-5 h-5" />
             </button>
@@ -161,8 +210,8 @@ export default function Header({
                 🏖️
               </div>
               <div>
-                <h3 className="text-lg font-bold text-slate-900">Delivery Sotto l'Ombrellone</h3>
-                <p className="text-xs text-slate-500">I ristoranti consegnano direttamente al tuo lettino</p>
+                <h3 className="text-lg font-black text-slate-900">Delivery Sotto l'Ombrellone</h3>
+                <p className="text-xs text-slate-500">I ristoratori di Follonica consegnano direttamente al tuo lettino</p>
               </div>
             </div>
 
@@ -181,7 +230,6 @@ export default function Header({
                       {club.name} ({club.zone} - {club.address})
                     </option>
                   ))}
-
                 </select>
               </div>
 
@@ -191,17 +239,17 @@ export default function Header({
                 </label>
                 <input
                   type="text"
-                  placeholder="Es. Ombrellone 42, Fila 3 o Vicino Chiosco"
+                  placeholder="Es. Ombrellone 42, 2a Fila o Vicino Chiosco"
                   value={umbrellaNum}
                   onChange={(e) => setUmbrellaNum(e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-follo-blue placeholder:text-slate-400"
                 />
               </div>
 
-              <div className="p-3 bg-blue-50 rounded-xl border border-blue-100 flex items-start gap-2.5">
+              <div className="p-3 bg-sky-50 rounded-xl border border-sky-100 flex items-start gap-2.5">
                 <Sun className="w-4 h-4 text-follo-blue shrink-0 mt-0.5" />
-                <p className="text-xs text-blue-900 leading-relaxed">
-                  Il rider o lo staff consegnerà il cibo caldo direttamente all'ingresso dello stabilimento o al tuo ombrellone.
+                <p className="text-xs text-sky-900 leading-relaxed">
+                  Il rider o lo staff consegnerà il cibo caldo direttamente all'ingresso dello stabilimento o al tuo ombrellone con verifica del PIN di sicurezza a 4 cifre.
                 </p>
               </div>
 
@@ -209,14 +257,14 @@ export default function Header({
                 <button
                   type="button"
                   onClick={() => setShowBeachModal(false)}
-                  className="flex-1 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+                  className="flex-1 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50"
                 >
                   Annulla
                 </button>
                 <button
                   type="button"
                   onClick={handleConfirmBeach}
-                  className="flex-1 py-2.5 rounded-xl bg-follo-blue text-sm font-semibold text-white hover:bg-follo-blue-dark shadow-md"
+                  className="flex-1 py-2.5 rounded-xl bg-follo-blue text-xs font-bold text-white hover:bg-follo-blue-dark shadow-md"
                 >
                   Conferma Spiaggia
                 </button>
@@ -253,7 +301,7 @@ export default function Header({
                   notifications.map((n) => (
                     <div
                       key={n.id}
-                      className="p-4 rounded-2xl bg-amber-50/60 border border-amber-200/80 shadow-xs"
+                      className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200/80 shadow-xs"
                     >
                       <div className="flex items-center justify-between text-[11px] text-amber-700 font-bold mb-1">
                         <span>{n.merchant_name}</span>
@@ -269,7 +317,7 @@ export default function Header({
 
             <div className="pt-4 border-t border-slate-100 text-center">
               <p className="text-[11px] text-slate-400">
-                FolloEat rispetta la tua quiete: max 1 notifica al giorno garantita su tutto il territorio.
+                FolloEat rispetta la tua quiete: max 1 notifica promozionale al giorno.
               </p>
             </div>
           </div>

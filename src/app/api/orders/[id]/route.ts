@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-export const runtime = 'edge';
 import { getOrderById, updateOrderStatus } from '@/lib/db';
 import { OrderStatus, CaptureStatus } from '@/lib/types';
 
