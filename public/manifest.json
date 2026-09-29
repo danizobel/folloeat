@@ -1,16 +1,32 @@
 {
-  "name": "folloeat.",
-  "short_name": "folloeat",
-  "description": "Piattaforma SaaS Iperlocale di Food Delivery e Tavoli a Follonica",
-  "start_url": "/",
+  "name": "folloeat. - Cibo, Spiaggia & Tavoli a Follonica",
+  "short_name": "folloeat.",
+  "description": "Piattaforma etica iperlocale di Food Delivery, Asporto, Consegna all'Ombrellone e Radar Tavoli a Follonica (GR)",
+  "start_url": "/?source=pwa",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#F8FAFC",
+  "orientation": "portrait",
+  "background_color": "#0F172A",
   "theme_color": "#0284C7",
+  "categories": ["food", "shopping", "lifestyle"],
   "icons": [
     {
-      "src": "/icon",
-      "sizes": "32x32",
-      "type": "image/png"
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Radar Tavoli",
+      "url": "/?tab=tables",
+      "description": "Tavoli 2° turno post-21:30 a Follonica"
+    },
+    {
+      "name": "Ordina Subito",
+      "url": "/?tab=search",
+      "description": "Cerca ristoranti e pizzerie di Follonica"
     }
   ]
 }

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+export const runtime = 'edge';
+
 import { getSponsoredNotifications, createSponsoredNotification } from '@/lib/db';
 
 export async function GET() {

@@ -16,7 +16,9 @@ import {
   FileText,
   MapPin,
   Navigation,
-  Check
+  Check,
+  Users,
+  Share2
 } from 'lucide-react';
 import { OrderItem, Order } from '@/lib/types';
 import {
@@ -62,6 +64,10 @@ export default function CartCheckoutModal({
   const [couponCode, setCouponCode] = useState('');
   const [couponApplied, setCouponApplied] = useState(false);
   const [couponError, setCouponError] = useState('');
+
+  // Group Order & Split Conto Alla Romana state (Master Spec v4.1 Section 4)
+  const [splitPeople, setSplitPeople] = useState(2);
+  const [showSplitCalculator, setShowSplitCalculator] = useState(false);
 
   // 18+ Alcohol Modal state
   const [ageConfirmed18, setAgeConfirmed18] = useState(false);
@@ -125,6 +131,25 @@ export default function CartCheckoutModal({
       setCouponApplied(false);
       setCouponError('Coupon non valido. Usa "FOLLO5" per il 5% di sconto.');
     }
+  };
+
+  const handleShareWhatsApp = () => {
+    const quotaPerPerson = (finalTotal / splitPeople).toFixed(2);
+    const destStr = pickupPoint ? `Spiaggia (${pickupPoint})` : (deliveryAddress || 'Follonica (58022)');
+    const itemsList = items.map(i => `• ${i.quantity}x ${i.name} (€${(i.price * i.quantity).toFixed(2)})`).join('\n');
+    const msg = `🍕 *Ordine FolloEat da ${merchantName}*
+📍 Consegna: ${destStr}
+💶 Totale: €${finalTotal.toFixed(2)}
+👥 Quota alla romana (${splitPeople} persone): *€${quotaPerPerson} a testa*
+
+📋 Dettaglio Piatti:
+${itemsList}
+
+💳 Pagamento: ${paymentMethod === 'CARD' ? 'Carta di Credito (Auth & Capture)' : 'Contanti alla consegna'}
+🌊 Ordinato con l'app di Follonica: folloeat.`;
+
+    const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
+    window.open(url, '_blank');
   };
 
   const handleSubmitOrder = async (e: React.FormEvent) => {
@@ -598,6 +623,71 @@ export default function CartCheckoutModal({
                       Resto previsto alla consegna: €{(parseFloat(cashChangeFrom) - finalTotal).toFixed(2)}
                     </p>
                   )}
+                </div>
+              )}
+            </div>
+
+            {/* Group Order & Split Conto alla Romana (Master Spec v4.1 Section 4) */}
+            <div className="rounded-2xl border border-sky-100 bg-gradient-to-r from-sky-50/70 to-blue-50/50 p-3.5 space-y-3">
+              <div className="flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => setShowSplitCalculator(!showSplitCalculator)}
+                  className="flex items-center gap-2 text-xs font-black text-slate-800 hover:text-follo-blue transition-colors text-left"
+                >
+                  <Users className="w-4 h-4 text-follo-blue shrink-0" />
+                  <span>Siete in gruppo? Dividi alla Romana & WhatsApp</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowSplitCalculator(!showSplitCalculator)}
+                  className="text-[11px] font-bold text-follo-blue hover:underline"
+                >
+                  {showSplitCalculator ? 'Nascondi' : 'Calcola Quote'}
+                </button>
+              </div>
+
+              {showSplitCalculator && (
+                <div className="pt-2 border-t border-sky-200/60 space-y-3 animate-in fade-in">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-semibold text-slate-700">Numero di persone al tavolo / ombrellone:</span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setSplitPeople(Math.max(2, splitPeople - 1))}
+                        className="w-7 h-7 rounded-lg bg-white border border-slate-200 text-slate-700 font-bold flex items-center justify-center hover:bg-slate-50"
+                      >
+                        -
+                      </button>
+                      <span className="font-black text-slate-900 w-6 text-center">{splitPeople}</span>
+                      <button
+                        type="button"
+                        onClick={() => setSplitPeople(Math.min(20, splitPeople + 1))}
+                        className="w-7 h-7 rounded-lg bg-white border border-slate-200 text-slate-700 font-bold flex items-center justify-center hover:bg-slate-50"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-white rounded-xl border border-sky-200 flex items-center justify-between text-xs">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Quota a persona</span>
+                      <span className="text-base font-black text-follo-blue">
+                        €{(finalTotal / splitPeople).toFixed(2)}
+                      </span>
+                      <span className="text-[10px] text-slate-500 block">su €{finalTotal.toFixed(2)} totale</span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleShareWhatsApp}
+                      className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-xs transition-colors"
+                    >
+                      <Share2 className="w-3.5 h-3.5" />
+                      <span>Invia quote su WhatsApp</span>
+                    </button>
+                  </div>
                 </div>
               )}
             </div>

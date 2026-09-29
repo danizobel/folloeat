@@ -28,7 +28,7 @@ export default function BottomDockNav({
   onOpenCart
 }: BottomDockNavProps) {
   return (
-    <nav className="fixed bottom-0 left-0 right-0 h-16 bg-white/95 backdrop-blur-md border-t border-slate-200/90 z-40 px-3 md:px-8 flex items-center justify-around shadow-lg">
+    <nav className="fixed bottom-0 left-0 right-0 pb-[env(safe-area-inset-bottom,0px)] h-[calc(4rem+env(safe-area-inset-bottom,0px))] bg-white/95 backdrop-blur-md border-t border-slate-200/90 z-40 px-3 md:px-8 flex items-center justify-around shadow-lg">
       {/* Tab 1: Home */}
       <button
         onClick={() => onTabChange('home')}

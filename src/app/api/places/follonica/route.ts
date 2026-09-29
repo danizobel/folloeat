@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+
+export const runtime = 'edge';
 import { getMerchants, getMenuItems } from '@/lib/db';
 import { Merchant } from '@/lib/types';
 

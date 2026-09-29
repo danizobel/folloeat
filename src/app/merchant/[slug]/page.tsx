@@ -1,5 +1,7 @@
 'use client';
 
+export const runtime = 'edge';
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -60,6 +62,11 @@ export default function MerchantTerminalPage() {
 
   // Panic button controls
   const [isUpdatingPanic, setIsUpdatingPanic] = useState(false);
+
+  // Delivery 4-Digit Security PIN Verification Modal (Master Spec v4.1 Section 4)
+  const [pinModalOrder, setPinModalOrder] = useState<Order | null>(null);
+  const [pinInput, setPinInput] = useState('');
+  const [pinError, setPinError] = useState('');
 
   const fetchMerchantData = async () => {
     try {
@@ -137,6 +144,26 @@ export default function MerchantTerminalPage() {
     } catch (err) {
       console.error('Error updating order:', err);
     }
+  };
+
+  const handleInitiateComplete = (order: Order) => {
+    if (order.delivery_pin) {
+      setPinModalOrder(order);
+      setPinInput('');
+      setPinError('');
+    } else {
+      handleUpdateOrderStatus(order.id, 'COMPLETED');
+    }
+  };
+
+  const handleConfirmPin = (bypass = false) => {
+    if (!pinModalOrder) return;
+    if (!bypass && pinInput.trim() !== pinModalOrder.delivery_pin) {
+      setPinError('PIN errato. Verifica con il cliente il codice a 4 cifre mostrato sulla sua app.');
+      return;
+    }
+    handleUpdateOrderStatus(pinModalOrder.id, 'COMPLETED');
+    setPinModalOrder(null);
   };
 
   // Panic button handlers (Snooze & Kitchen Delay)
@@ -586,10 +613,10 @@ export default function MerchantTerminalPage() {
                         </button>
                       ) : (
                         <button
-                          onClick={() => handleUpdateOrderStatus(order.id, 'COMPLETED')}
+                          onClick={() => handleInitiateComplete(order)}
                           className="flex-1 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-colors"
                         >
-                          Consegna Conclusa
+                          Consegna Conclusa (PIN)
                         </button>
                       )}
                     </div>
@@ -653,6 +680,75 @@ export default function MerchantTerminalPage() {
               >
                 <Printer className="w-4 h-4" />
                 <span>Stampa Termica</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 4-Digit Delivery PIN Verification Modal (Sunmi V2s / Rider Anti-Fraud) */}
+      {pinModalOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-slate-900 rounded-3xl max-w-sm w-full p-6 border border-slate-800 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-amber-400 font-bold text-xs uppercase tracking-wider">
+                <ShieldAlert className="w-4 h-4 text-amber-400" />
+                <span>Verifica Consegna Rider</span>
+              </div>
+              <button
+                onClick={() => setPinModalOrder(null)}
+                className="p-1 rounded-full text-slate-400 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div>
+              <h3 className="text-base font-black text-white">
+                Inserisci PIN Cliente
+              </h3>
+              <p className="text-xs text-slate-400 mt-1">
+                Comanda per <strong>{pinModalOrder.customer_name}</strong> · Ordine #{pinModalOrder.id}
+              </p>
+            </div>
+
+            {pinError && (
+              <div className="p-2.5 rounded-xl bg-red-950/80 border border-red-800 text-red-300 text-xs font-medium">
+                {pinError}
+              </div>
+            )}
+
+            <div>
+              <label className="block text-[11px] font-bold text-slate-400 mb-1.5 uppercase">
+                PIN di sicurezza (4 Cifre):
+              </label>
+              <input
+                type="text"
+                maxLength={4}
+                autoFocus
+                placeholder="Es. 8421"
+                value={pinInput}
+                onChange={(e) => setPinInput(e.target.value.replace(/\D/g, ''))}
+                className="w-full text-center text-3xl font-black tracking-widest py-3 rounded-2xl bg-slate-950 border border-amber-500/60 text-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-400"
+              />
+              <p className="text-[10px] text-slate-500 mt-1.5 text-center">
+                PIN atteso: {pinModalOrder.delivery_pin} (mostrato anche sullo scontrino 58mm)
+              </p>
+            </div>
+
+            <div className="space-y-2 pt-2">
+              <button
+                onClick={() => handleConfirmPin(false)}
+                disabled={pinInput.length < 4}
+                className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white font-bold text-xs shadow-md transition-all"
+              >
+                Valida PIN & Concludi Consegna
+              </button>
+              <button
+                onClick={() => handleConfirmPin(true)}
+                className="w-full py-2 text-[11px] text-slate-500 hover:text-slate-300 transition-colors"
+              >
+                Consegna senza PIN (Forza sblocco)
               </button>
             </div>
           </div>

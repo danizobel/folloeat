@@ -73,7 +73,7 @@ export default function Header({
 
   return (
     <>
-      <header className="fixed top-0 left-0 right-0 h-16 bg-white/95 backdrop-blur-md border-b border-slate-200/90 z-40 px-4 md:px-8 flex items-center justify-between shadow-xs">
+      <header className="fixed top-0 left-0 right-0 pt-[env(safe-area-inset-top,0px)] h-[calc(4rem+env(safe-area-inset-top,0px))] bg-white/95 backdrop-blur-md border-b border-slate-200/90 z-40 px-4 md:px-8 flex items-center justify-between shadow-xs">
         {/* Zone 1: Brand Wordmark */}
         <div className="flex items-center gap-3">
           <Link href="/" className="flex items-baseline group hover:opacity-90 transition-opacity">

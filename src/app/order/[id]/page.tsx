@@ -1,6 +1,8 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+export const runtime = 'edge';
+
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import Logo from '@/components/Logo';
@@ -16,7 +18,8 @@ import {
   Star,
   Umbrella,
   Receipt,
-  AlertCircle
+  AlertCircle,
+  Share2
 } from 'lucide-react';
 import { Order, OrderItem } from '@/lib/types';
 
@@ -32,12 +35,39 @@ export default function OrderTrackingPage() {
   const [rating, setRating] = useState(5);
   const [reviewComment, setReviewComment] = useState('');
   const [reviewSubmitted, setReviewSubmitted] = useState(false);
+  const previousStatusRef = useRef<string>('');
+
+  const playCustomerChime = () => {
+    try {
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioContextClass) return;
+      const ctx = new AudioContextClass();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
+      osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.15); // A5
+      gain.gain.setValueAtTime(0.12, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.38);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.4);
+      if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+        navigator.vibrate([150, 80, 150]);
+      }
+    } catch {}
+  };
 
   const fetchOrder = async () => {
     try {
       const res = await fetch(`/api/orders/${orderId}`);
       const data = await res.json();
-      if (data.success) {
+      if (data.success && data.order) {
+        if (previousStatusRef.current && previousStatusRef.current !== data.order.status) {
+          playCustomerChime();
+        }
+        previousStatusRef.current = data.order.status;
         setOrder(data.order);
       } else {
         setErrorMsg(data.error || 'Ordine non trovato');
@@ -47,6 +77,20 @@ export default function OrderTrackingPage() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleShareTrackingWhatsApp = () => {
+    if (!order) return;
+    const trackingUrl = typeof window !== 'undefined' ? window.location.href : `https://folloeat.it/order/${order.id}`;
+    const dest = order.pickup_point ? `Spiaggia (${order.pickup_point})` : (order.delivery_address || 'Follonica');
+    const msg = `🛵 *Tracking Ordine FolloEat* da *${order.merchant_name}*
+📍 Destinazione: ${dest}
+🔢 PIN di Consegna Rider: *${order.delivery_pin || '---'}*
+⏱️ Stato attuale: ${order.status}
+🔗 Segui l'avanzamento in tempo reale qui: ${trackingUrl}`;
+
+    const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
+    window.open(url, '_blank');
   };
 
   useEffect(() => {
@@ -192,18 +236,28 @@ export default function OrderTrackingPage() {
 
               {/* PIN di Consegna & Tracking */}
               {order.delivery_pin && (
-                <div className="p-4 rounded-2xl bg-amber-50/90 border border-amber-200 flex items-center justify-between shadow-xs">
-                  <div>
-                    <span className="text-[10px] font-black uppercase text-amber-800 tracking-wider block">
-                      PIN Di Consegna Rider
-                    </span>
-                    <span className="text-xs text-amber-700">
-                      Mostra o comunica questo PIN al rider per convalidare il ritiro
-                    </span>
+                <div className="p-4 rounded-2xl bg-amber-50/90 border border-amber-200 shadow-xs space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] font-black uppercase text-amber-800 tracking-wider block">
+                        PIN Di Consegna Rider
+                      </span>
+                      <span className="text-xs text-amber-700">
+                        Mostra o comunica questo PIN al rider per convalidare il ritiro
+                      </span>
+                    </div>
+                    <div className="text-2xl font-black tracking-widest text-amber-900 bg-white px-3.5 py-1.5 rounded-xl border border-amber-300 shadow-xs">
+                      {order.delivery_pin}
+                    </div>
                   </div>
-                  <div className="text-2xl font-black tracking-widest text-amber-900 bg-white px-3.5 py-1.5 rounded-xl border border-amber-300 shadow-xs">
-                    {order.delivery_pin}
-                  </div>
+
+                  <button
+                    onClick={handleShareTrackingWhatsApp}
+                    className="w-full py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs transition-colors"
+                  >
+                    <Share2 className="w-3.5 h-3.5" />
+                    <span>Invia link tracking e PIN su WhatsApp</span>
+                  </button>
                 </div>
               )}
 

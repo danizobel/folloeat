@@ -1,5 +1,7 @@
 'use client';
 
+export const runtime = 'edge';
+
 import React, { useState, useEffect } from 'react';
 import Header from '@/components/Header';
 import InteractiveMap from '@/components/InteractiveMap';
@@ -9,6 +11,7 @@ import FastSeatingModal from '@/components/FastSeatingModal';
 import UserAuthModal from '@/components/UserAuthModal';
 import UserProfileModal from '@/components/UserProfileModal';
 import BottomDockNav, { NavTab } from '@/components/BottomDockNav';
+import InstallPwaBanner from '@/components/InstallPwaBanner';
 import Footer from '@/components/Footer';
 import Logo from '@/components/Logo';
 import {
@@ -357,7 +360,7 @@ export default function HomePage() {
   const cartTotalCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
 
   return (
-    <div className="min-h-screen pb-24 pt-20 px-4 md:px-8 max-w-7xl mx-auto font-sans">
+    <div className="min-h-screen pt-[calc(4.5rem+env(safe-area-inset-top,0px))] pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] px-4 md:px-8 max-w-7xl mx-auto font-sans">
       {/* Fixed Top Bar Navigation */}
       <Header
         selectedZone={selectedZone}
@@ -388,6 +391,9 @@ export default function HomePage() {
           <p className="text-xs font-semibold leading-relaxed">{signalSuccessMessage}</p>
         </div>
       )}
+
+      {/* PWA App Installation Prompt for Mobile/Desktop */}
+      <InstallPwaBanner />
 
       {/* TAB CONTENT: RADAR TAVOLI */}
       {activeTab === 'tables' ? (

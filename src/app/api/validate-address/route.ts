@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+export const runtime = 'edge';
 import { validateFollonicaAddress, geocodeAddressOSM } from '@/lib/address-validation';
 
 export async function POST(req: NextRequest) {
