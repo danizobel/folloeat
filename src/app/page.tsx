@@ -50,7 +50,8 @@ import {
   Umbrella,
   Star,
   User as UserIcon,
-  Navigation
+  Navigation,
+  Compass
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -537,18 +538,82 @@ export default function HomePage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {filteredPlaces.map((place) => (
-              <div key={place.id} className="bg-white rounded-3xl p-5 border border-slate-200 shadow-xs space-y-3">
-                <h3 className="font-bold text-base text-slate-900">{place.name}</h3>
-                <p className="text-xs text-slate-500">{place.address}</p>
-                <button
-                  onClick={() => handleOpenMenu(place)}
-                  className="w-full py-2 bg-follo-blue text-white rounded-xl text-xs font-bold"
-                >
-                  Vedi Menù
-                </button>
-              </div>
-            ))}
+            {filteredPlaces.map((place) => {
+              const isAccredited = place.is_accredited === 1 || place.is_partner === 1;
+              const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent((place.address || place.name) + ', Follonica')}`;
+
+              return (
+                <div key={place.id} className="bg-white rounded-3xl p-5 border border-slate-200 shadow-xs space-y-3 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-[10px] font-bold text-follo-blue uppercase tracking-wider">{place.category}</span>
+                      {isAccredited ? (
+                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                          Partner Accreditato
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+                          Solo Indicazioni & Chiamata
+                        </span>
+                      )}
+                    </div>
+                    <h3 className="font-bold text-base text-slate-900">{place.name}</h3>
+                    <p className="text-xs text-slate-500 mt-1 flex items-center gap-1">
+                      <MapPin className="w-3.5 h-3.5 text-follo-red shrink-0" />
+                      {place.address}
+                    </p>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-100">
+                    {isAccredited ? (
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleOpenMenu(place)}
+                          className="flex-1 py-2 bg-follo-blue hover:bg-follo-blue-dark text-white rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-1 shadow-xs cursor-pointer"
+                        >
+                          <span>Vedi Menù & Ordina</span>
+                          <ChevronRight className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleOpenReservation(place)}
+                          className="px-3 py-2 bg-amber-100 hover:bg-amber-200 text-amber-900 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                        >
+                          Tavolo
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-1.5">
+                        <div className="flex gap-2">
+                          <a
+                            href={`tel:${place.phone}`}
+                            className="flex-1 py-2 bg-follo-slate hover:bg-slate-800 text-white rounded-xl text-xs font-bold text-center flex items-center justify-center gap-1.5 transition-colors shadow-2xs"
+                          >
+                            <Phone className="w-3.5 h-3.5 text-follo-sand" />
+                            <span>Chiama ({place.phone})</span>
+                          </a>
+                          <a
+                            href={directionsUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold text-center flex items-center justify-center gap-1 transition-colors border border-slate-200"
+                            title="Indicazioni stradali su Google Maps"
+                          >
+                            <Compass className="w-3.5 h-3.5 text-follo-blue" />
+                            <span className="hidden sm:inline">GPS</span>
+                          </a>
+                        </div>
+                        <button
+                          onClick={() => handleSignalPlace(place)}
+                          className="w-full text-center text-[10px] text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+                        >
+                          Segnala a FolloEat di attivare gli ordini online
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       ) : (
@@ -858,7 +923,7 @@ export default function HomePage() {
                             </span>
                           ) : (
                             <span className="px-2.5 py-1 rounded-xl bg-slate-900/80 backdrop-blur-xs text-white text-[10px] font-bold uppercase tracking-wider">
-                              Attività di Follonica
+                              📍 Solo Indicazioni & Chiamata
                             </span>
                           )}
                         </div>
@@ -939,8 +1004,9 @@ export default function HomePage() {
                             <span>Consegna al lido</span>
                           </div>
                         ) : (
-                          <div className="mt-3 pt-3 border-t border-slate-200 text-[11px] text-slate-500 leading-relaxed">
-                            Scheda censita. Chiama direttamente per ordinare al telefono o prenotare.
+                          <div className="mt-3 pt-3 border-t border-slate-200 text-[11px] text-slate-500 leading-relaxed flex items-center justify-between">
+                            <span>Attività censita (Non accreditata agli ordini online)</span>
+                            <span className="text-[10px] font-bold text-slate-400">Solo Chiamata</span>
                           </div>
                         )}
                       </div>
@@ -967,16 +1033,28 @@ export default function HomePage() {
                         </div>
                       ) : (
                         <div className="space-y-2">
-                          <a
-                            href={`tel:${place.phone}`}
-                            className="w-full py-2.5 px-3 rounded-2xl bg-follo-slate hover:bg-slate-800 text-white font-bold text-xs shadow-xs transition-colors flex items-center justify-center gap-2"
-                          >
-                            <Phone className="w-3.5 h-3.5 text-follo-sand" />
-                            <span>Chiama Locale ({place.phone})</span>
-                          </a>
+                          <div className="flex gap-2">
+                            <a
+                              href={`tel:${place.phone}`}
+                              className="flex-1 py-2.5 px-3 rounded-2xl bg-follo-slate hover:bg-slate-800 text-white font-bold text-xs shadow-xs transition-colors flex items-center justify-center gap-1.5"
+                            >
+                              <Phone className="w-3.5 h-3.5 text-follo-sand" />
+                              <span>Chiama ({place.phone})</span>
+                            </a>
+                            <a
+                              href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent((place.address || place.name) + ', Follonica')}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-3 py-2.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors flex items-center justify-center gap-1 border border-slate-200"
+                              title="Indicazioni stradali su Google Maps / Waze"
+                            >
+                              <Compass className="w-3.5 h-3.5 text-follo-blue" />
+                              <span className="hidden sm:inline">GPS</span>
+                            </a>
+                          </div>
                           <button
                             onClick={() => handleSignalPlace(place)}
-                            className="w-full py-1.5 px-3 text-[11px] text-slate-500 hover:text-slate-700 font-medium transition-colors text-center block"
+                            className="w-full py-1 text-[11px] text-slate-500 hover:text-slate-700 font-medium transition-colors text-center block cursor-pointer"
                           >
                             Segnala a FolloEat di attivare gli ordini online
                           </button>
