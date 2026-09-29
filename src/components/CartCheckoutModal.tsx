@@ -18,7 +18,9 @@ import {
   Navigation,
   Check,
   Users,
-  Share2
+  Share2,
+  Clock,
+  Umbrella
 } from 'lucide-react';
 import { OrderItem, Order } from '@/lib/types';
 import {
@@ -61,9 +63,18 @@ export default function CartCheckoutModal({
   const [paymentMethod, setPaymentMethod] = useState<'CARD' | 'CASH'>('CARD');
   const [cashChangeFrom, setCashChangeFrom] = useState('');
   const [cutleryRequested, setCutleryRequested] = useState(false);
+  const [ecoPackaging, setEcoPackaging] = useState(false);
   const [couponCode, setCouponCode] = useState('');
   const [couponApplied, setCouponApplied] = useState(false);
   const [couponError, setCouponError] = useState('');
+
+  // Slot Limiter Pomeridiano & Consegna Programmata (Master Spec v4.1 Section 4)
+  const [deliveryTiming, setDeliveryTiming] = useState<'ASAP' | 'SCHEDULED'>('ASAP');
+  const [scheduledSlot, setScheduledSlot] = useState('13:00');
+
+  // Beach Delivery Mode & Pick-up Point (Master Spec v4.1 Section 4)
+  const [beachDeliveryMode, setBeachDeliveryMode] = useState<'UMBRELLA' | 'PICKUP_POINT'>('UMBRELLA');
+  const [umbrellaNumber, setUmbrellaNumber] = useState('');
 
   // Group Order & Split Conto Alla Romana state (Master Spec v4.1 Section 4)
   const [splitPeople, setSplitPeople] = useState(2);
@@ -121,7 +132,8 @@ export default function CartCheckoutModal({
   // FOLLO5 coupon discount (-5% on food subtotal)
   const discountAmount = couponApplied ? Number((foodSubtotal * 0.05).toFixed(2)) : 0;
   const platformFee = 0.15; // Contributo Digitale & Ristorazione Follonichese
-  const finalTotal = Number((foodSubtotal - discountAmount + platformFee).toFixed(2));
+  const ecoPackagingFee = ecoPackaging ? 0.25 : 0; // Eco-Packaging Fee (Master Spec v4.1 Section 2)
+  const finalTotal = Number((foodSubtotal - discountAmount + platformFee + ecoPackagingFee).toFixed(2));
 
   const handleApplyCoupon = () => {
     if (couponCode.trim().toUpperCase() === 'FOLLO5') {
@@ -149,7 +161,11 @@ ${itemsList}
 🌊 Ordinato con l'app di Follonica: folloeat.`;
 
     const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
-    window.open(url, '_blank');
+    const link = document.createElement('a');
+    link.href = url;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.click();
   };
 
   const handleSubmitOrder = async (e: React.FormEvent) => {
@@ -200,6 +216,12 @@ ${itemsList}
     setIsLoading(true);
 
     try {
+      const timingNote = deliveryTiming === 'SCHEDULED' ? `[Orario Consegna Desiderato: ${scheduledSlot}]` : '[Consegna Immediata]';
+      const beachNote = pickupPoint
+        ? (beachDeliveryMode === 'PICKUP_POINT' ? '[Ritiro a Pick-up Point Ufficiale Ingresso Lido]' : (umbrellaNumber ? `[Consegna Ombrellone n° ${umbrellaNumber}]` : ''))
+        : '';
+      const fullNotes = [timingNote, beachNote, notes.trim()].filter(Boolean).join(' ');
+
       const res = await fetch('/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -210,12 +232,13 @@ ${itemsList}
           delivery_address: deliveryAddress || (pickupPoint ? `Spiaggia - ${pickupPoint}` : undefined),
           zone: zone || 'Centro',
           pickup_point: pickupPoint || undefined,
+          umbrella_number: umbrellaNumber || undefined,
           items,
           payment_method: paymentMethod,
           cash_change_from: paymentMethod === 'CASH' ? parseFloat(cashChangeFrom) : undefined,
           cutlery_requested: cutleryRequested,
           coupon_code: couponApplied ? 'FOLLO5' : undefined,
-          notes
+          notes: fullNotes
         })
       });
 
@@ -358,11 +381,155 @@ ${itemsList}
               </div>
             </label>
 
+            {/* Eco-Packaging Fee Option (Master Spec v4.1 Section 2) */}
+            <label className="flex items-start gap-3 p-3 rounded-2xl bg-emerald-50/60 border border-emerald-100 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={ecoPackaging}
+                onChange={(e) => setEcoPackaging(e.target.checked)}
+                className="mt-1 w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500"
+              />
+              <div className="text-xs flex-1">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-emerald-950 flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                    Packaging Ecologico 100% Compostabile (+€0,25)
+                  </span>
+                  <span className="font-black text-emerald-900">+€0,25</span>
+                </div>
+                <p className="text-emerald-700 mt-0.5">
+                  Sacchetti e vaschette in carta riciclabile e PLA biodegradabile per salvaguardare il Golfo.
+                </p>
+              </div>
+            </label>
+
             {/* Customer Details Form (Passwordless) */}
             <div className="space-y-3">
               <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
                 I tuoi dati di consegna (Senza password)
               </h4>
+
+              {/* Slot Limiter Pomeridiano / Orario Consegna (Master Spec v4.1 Section 4) */}
+              <div className="p-3.5 rounded-2xl bg-sky-50/70 border border-sky-100 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-follo-blue" />
+                    <span>Tempistica di Consegna</span>
+                  </span>
+                  <span className="text-[10px] font-semibold text-slate-500">Slot 15 min anti-ingorgo</span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setDeliveryTiming('ASAP')}
+                    className={`py-2 px-3 rounded-xl text-xs font-bold transition-all text-left flex items-center justify-between ${
+                      deliveryTiming === 'ASAP'
+                        ? 'bg-follo-blue text-white shadow-xs'
+                        : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    <span>Prima possibile</span>
+                    <span className="text-[10px] opacity-80">25-35 min</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setDeliveryTiming('SCHEDULED')}
+                    className={`py-2 px-3 rounded-xl text-xs font-bold transition-all text-left flex items-center justify-between ${
+                      deliveryTiming === 'SCHEDULED'
+                        ? 'bg-follo-blue text-white shadow-xs'
+                        : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    <span>Orario programmato</span>
+                    <span className="text-[10px] opacity-80">{scheduledSlot}</span>
+                  </button>
+                </div>
+
+                {deliveryTiming === 'SCHEDULED' && (
+                  <div className="pt-2 border-t border-sky-100 animate-in fade-in space-y-1.5">
+                    <span className="text-[11px] font-bold text-slate-700 block">
+                      Seleziona Scaglione Orario (Pranzo mare o Cena):
+                    </span>
+                    <div className="grid grid-cols-4 sm:grid-cols-6 gap-1.5">
+                      {['12:45', '13:00', '13:15', '13:30', '13:45', '14:00', '19:45', '20:00', '20:15', '20:30', '20:45', '21:00'].map((slot) => (
+                        <button
+                          key={slot}
+                          type="button"
+                          onClick={() => setScheduledSlot(slot)}
+                          className={`py-1.5 px-1 rounded-lg text-[11px] font-bold transition-all ${
+                            scheduledSlot === slot
+                              ? 'bg-follo-slate text-white ring-1 ring-follo-slate'
+                              : 'bg-white border border-slate-200 text-slate-700 hover:bg-sky-100 hover:text-follo-blue'
+                          }`}
+                        >
+                          {slot}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Beach Delivery Mode Options if Beach Order */}
+              {pickupPoint && (
+                <div className="p-3.5 rounded-2xl bg-amber-50/70 border border-amber-200 space-y-2">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-amber-950">
+                    <Umbrella className="w-4 h-4 text-amber-600" />
+                    <span>Consegna Balneare ({pickupPoint})</span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => setBeachDeliveryMode('UMBRELLA')}
+                      className={`p-2.5 rounded-xl border font-bold text-left transition-all ${
+                        beachDeliveryMode === 'UMBRELLA'
+                          ? 'border-amber-500 bg-amber-100 text-amber-950 ring-1 ring-amber-400'
+                          : 'border-amber-200 bg-white text-slate-700 hover:bg-amber-50/50'
+                      }`}
+                    >
+                      <div className="text-xs">Sotto l&apos;Ombrellone</div>
+                      <div className="text-[10px] font-normal text-slate-500">Consegna al lettino</div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setBeachDeliveryMode('PICKUP_POINT')}
+                      className={`p-2.5 rounded-xl border font-bold text-left transition-all ${
+                        beachDeliveryMode === 'PICKUP_POINT'
+                          ? 'border-amber-500 bg-amber-100 text-amber-950 ring-1 ring-amber-400'
+                          : 'border-amber-200 bg-white text-slate-700 hover:bg-amber-50/50'
+                      }`}
+                    >
+                      <div className="text-xs">Pick-up Point Ufficiale</div>
+                      <div className="text-[10px] font-normal text-slate-500">Ingresso / Chiosco</div>
+                    </button>
+                  </div>
+
+                  {beachDeliveryMode === 'UMBRELLA' && (
+                    <div className="pt-1.5 animate-in fade-in">
+                      <label className="block text-[11px] font-bold text-amber-900 mb-1">
+                        Numero Ombrellone o Riferimento Spiaggia *
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Es. Ombrellone 42, 3° fila verso riva..."
+                        value={umbrellaNumber}
+                        onChange={(e) => setUmbrellaNumber(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl bg-white border border-amber-300 text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      />
+                    </div>
+                  )}
+
+                  {beachDeliveryMode === 'PICKUP_POINT' && (
+                    <p className="text-[10px] text-amber-800 leading-snug animate-in fade-in">
+                      📍 Il rider ti aspetterà al punto di incontro designato all&apos;ingresso dello stabilimento balneare.
+                    </p>
+                  )}
+                </div>
+              )}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
@@ -712,6 +879,16 @@ ${itemsList}
                 </span>
                 <span>€{platformFee.toFixed(2)}</span>
               </div>
+
+              {ecoPackaging && (
+                <div className="flex justify-between text-emerald-700 font-semibold">
+                  <span className="flex items-center gap-1">
+                    <Leaf className="w-3 h-3 text-emerald-600" />
+                    Packaging Ecologico Compostabile
+                  </span>
+                  <span>+€{ecoPackagingFee.toFixed(2)}</span>
+                </div>
+              )}
 
               <div className="pt-2 border-t border-slate-200 flex justify-between text-sm font-black text-slate-900">
                 <span>TOTALE ORDINE</span>

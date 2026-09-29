@@ -1,7 +1,5 @@
 'use client';
 
-export const runtime = 'edge';
-
 import React, { useState, useEffect } from 'react';
 import Header from '@/components/Header';
 import InteractiveMap from '@/components/InteractiveMap';
@@ -133,6 +131,9 @@ export default function HomePage() {
     items: OrderItem[];
     dateStr: string;
   } | null>(null);
+
+  // Map view footer toggle state to prevent map overlapping
+  const [showFooterInMap, setShowFooterInMap] = useState(false);
 
   // Load user session & "Il Mio Solito" on mount
   useEffect(() => {
@@ -389,6 +390,49 @@ export default function HomePage() {
         <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 max-w-md w-[92%] bg-emerald-600 text-white px-4 py-3 rounded-2xl shadow-xl flex items-center gap-3 animate-in fade-in slide-in-from-top-4">
           <CheckCircle2 className="w-5 h-5 shrink-0 text-white" />
           <p className="text-xs font-semibold leading-relaxed">{signalSuccessMessage}</p>
+        </div>
+      )}
+
+      {/* Fast Seating Confirmed Reservation Card (Anti No-Show) */}
+      {lastReservation && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 max-w-lg w-[94%] bg-slate-900 text-white p-4 sm:p-5 rounded-3xl shadow-2xl border border-amber-400/40 animate-in fade-in slide-in-from-top-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="w-8 h-8 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center font-bold text-sm">
+                🍽️
+              </span>
+              <div>
+                <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider block">
+                  Tavolo Confermato • Fast Seating
+                </span>
+                <h4 className="font-black text-sm text-white">{lastReservation.merchant_name}</h4>
+              </div>
+            </div>
+            <button
+              onClick={() => setLastReservation(null)}
+              className="p-1 rounded-full text-slate-400 hover:text-white"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 text-xs bg-slate-950/60 p-3 rounded-2xl border border-slate-800">
+            <div>
+              <span className="text-[10px] text-slate-400 block uppercase">Coperti Riservati</span>
+              <span className="font-bold text-amber-300">{lastReservation.party_size} persone</span>
+            </div>
+            <div>
+              <span className="text-[10px] text-slate-400 block uppercase">Orario 2° Turno</span>
+              <span className="font-bold text-white">{lastReservation.reservation_time}</span>
+            </div>
+          </div>
+
+          <p className="text-[11px] text-slate-300 flex items-start gap-1.5 leading-relaxed">
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+            <span>
+              <strong>Politica Anti No-Show:</strong> Riceverai un promemoria SMS/WhatsApp 2 ore prima per confermare con 1 tap o riaprire il tavolo sul radar.
+            </span>
+          </p>
         </div>
       )}
 
@@ -697,15 +741,74 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* VIEW: INTERACTIVE MAP (LEAFLET WITH FULL CONTROLS) */}
+          {/* VIEW: INTERACTIVE MAP (LEAFLET WITH FULL CONTROLS & FULLSCREEN) */}
           {viewMode === 'map' ? (
-            <div className="h-[520px] w-full animate-in fade-in rounded-3xl overflow-hidden border border-slate-200 shadow-md">
-              <InteractiveMap
-                places={filteredPlaces}
-                selectedPlace={selectedMerchant}
-                onSelectPlace={handleOpenMenu}
-                onSignalPlace={handleSignalPlace}
-              />
+            <div className="space-y-4 mb-6 animate-in fade-in">
+              {/* Map Context Bar */}
+              <div className="bg-gradient-to-r from-sky-600 via-follo-blue to-follo-blue-dark rounded-3xl p-4 sm:p-5 text-white shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-white/15 flex items-center justify-center shrink-0 text-xl shadow-inner">
+                    🗺️
+                  </div>
+                  <div>
+                    <h3 className="font-black text-base text-white">Mappa Georeferenziata del Golfo di Follonica</h3>
+                    <p className="text-xs text-sky-100">
+                      {filteredPlaces.length} locali censiti con coordinate GPS esatte. Usa i filtri rapidi, tocca i pin per ordinare o usa ⛶ per lo schermo intero.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
+                  <button
+                    onClick={() => setViewMode('cards')}
+                    className="px-3.5 py-1.5 rounded-xl bg-white/20 hover:bg-white/30 text-white text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
+                  >
+                    <List className="w-3.5 h-3.5" />
+                    <span>Torna alla Lista</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Map Frame: Optimized responsive viewport height without scroll or footer intrusion */}
+              <div className="relative isolate z-10 h-[calc(100vh-14.5rem)] min-h-[520px] max-h-[820px] w-full rounded-3xl overflow-hidden border border-slate-200 shadow-xl bg-slate-100">
+                <InteractiveMap
+                  places={filteredPlaces}
+                  selectedPlace={selectedMerchant}
+                  onSelectPlace={handleOpenMenu}
+                  onSignalPlace={handleSignalPlace}
+                />
+              </div>
+
+              {/* Map Bottom Helper & Clean Footer Disclosure */}
+              <div className="flex flex-wrap items-center justify-between gap-3 px-2 py-1 text-xs text-slate-500">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                  <span className="font-semibold text-slate-700">Mappa attiva a pieno schermo</span>
+                  <span className="hidden sm:inline text-slate-400">· Nessuna sovrapposizione con il footer</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowFooterInMap(!showFooterInMap)}
+                    className="text-follo-blue hover:text-follo-blue-dark font-bold hover:underline cursor-pointer"
+                  >
+                    {showFooterInMap ? 'Nascondi Informazioni Legali & B2B' : 'Mostra Note Legali & Info B2B'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('cards')}
+                    className="text-slate-600 hover:text-slate-900 font-bold hover:underline cursor-pointer"
+                  >
+                    Visualizza Griglia Locali
+                  </button>
+                </div>
+              </div>
+
+              {showFooterInMap && (
+                <div className="mt-8 mb-6 animate-in fade-in">
+                  <Footer />
+                </div>
+              )}
             </div>
           ) : (
             /* VIEW: RESTAURANT CARDS GRID */
@@ -888,8 +991,12 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* Territorial & Legal Footer */}
-      <Footer />
+      {/* Territorial & Legal Footer: rendered when in card mode or non-home tabs to prevent map overlap */}
+      {(viewMode === 'cards' || activeTab !== 'home') && (
+        <div className="mt-14 mb-8">
+          <Footer />
+        </div>
+      )}
 
       {/* User Login & Registration Modal */}
       <UserAuthModal

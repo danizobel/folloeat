@@ -195,11 +195,19 @@ export default function FastSeatingModal({
           <div className="p-3.5 rounded-2xl bg-amber-50/70 border border-amber-200/80 flex items-center justify-between text-xs">
             <div>
               <span className="font-bold text-amber-950 block">Servizio Fast Seating FolloEat</span>
-              <span className="text-[11px] text-amber-800">€0,50 per ciascun coperto confermato</span>
+              <span className="text-[11px] text-amber-800">€0,50 per ciascun coperto confermato (2° Turno)</span>
             </div>
             <div className="text-right">
               <span className="text-base font-black text-amber-950">€{totalFee.toFixed(2)}</span>
             </div>
+          </div>
+
+          {/* Anti No-Show Policy Notice (Master Spec v4.1 Section 4) */}
+          <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-[11px] text-slate-600 flex items-start gap-2">
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+            <p className="leading-snug">
+              <strong>Politica Anti No-Show:</strong> Riceverai un promemoria WhatsApp/SMS 2 ore prima dell&apos;orario per confermare con 1 click o liberare il tavolo per altri clienti del litorale.
+            </p>
           </div>
 
           <button

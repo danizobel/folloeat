@@ -73,7 +73,7 @@ export default function Header({
 
   return (
     <>
-      <header className="fixed top-0 left-0 right-0 pt-[env(safe-area-inset-top,0px)] h-[calc(4rem+env(safe-area-inset-top,0px))] bg-white/95 backdrop-blur-md border-b border-slate-200/90 z-40 px-4 md:px-8 flex items-center justify-between shadow-xs">
+      <header className="fixed top-0 left-0 right-0 pt-[env(safe-area-inset-top,0px)] h-[calc(4rem+env(safe-area-inset-top,0px))] bg-white/95 backdrop-blur-md border-b border-slate-200/90 z-50 px-4 md:px-8 flex items-center justify-between shadow-xs">
         {/* Zone 1: Brand Wordmark */}
         <div className="flex items-center gap-3">
           <Link href="/" className="flex items-baseline group hover:opacity-90 transition-opacity">
@@ -196,7 +196,7 @@ export default function Header({
 
       {/* Sotto l'Ombrellone Beach Selector Modal */}
       {showBeachModal && (
-        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in">
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs z-70 flex items-center justify-center p-4 animate-in fade-in">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 md:p-7 shadow-2xl border border-slate-100 relative">
             <button
               onClick={() => setShowBeachModal(false)}
@@ -276,7 +276,7 @@ export default function Header({
 
       {/* Local Promotions Drawer */}
       {showNotifDrawer && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/40 backdrop-blur-xs animate-in fade-in">
+        <div className="fixed inset-0 z-70 flex justify-end bg-slate-900/40 backdrop-blur-xs animate-in fade-in">
           <div className="w-full max-w-sm bg-white h-full shadow-2xl p-5 overflow-y-auto flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between pb-4 border-b border-slate-100">

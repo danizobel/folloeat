@@ -16,7 +16,11 @@ import {
   X,
   Filter,
   Boxes,
-  Clock
+  Clock,
+  Maximize2,
+  Minimize2,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 
 interface InteractiveMapProps {
@@ -74,6 +78,31 @@ export default function InteractiveMap({
   const [selectedMapCat, setSelectedMapCat] = useState('ALL');
   const [activeZone, setActiveZone] = useState('all');
   const [isLayersMenuOpen, setIsLayersMenuOpen] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isLegendOpen, setIsLegendOpen] = useState(false);
+  const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
+
+  const toggleFullscreen = () => {
+    setIsFullscreen(prev => !prev);
+    setTimeout(() => {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.invalidateSize();
+      }
+    }, 250);
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isFullscreen) {
+        setIsFullscreen(false);
+        setTimeout(() => {
+          mapInstanceRef.current?.invalidateSize();
+        }, 250);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isFullscreen]);
 
   // Compute venue counts per category for live filter chips
   const categoryCounts = useMemo(() => {
@@ -605,9 +634,28 @@ export default function InteractiveMap({
   const accreditedCount = places.filter(p => p.is_accredited === 1 || p.is_partner === 1).length;
 
   return (
-    <div className="w-full h-full relative min-h-[550px] bg-slate-100 flex flex-col font-sans select-none">
+    <div className={`w-full h-full relative bg-slate-100 flex flex-col font-sans select-none transition-all duration-300 ${
+      isFullscreen ? 'fixed inset-0 z-[9999] w-screen h-screen' : 'min-h-[480px]'
+    }`}>
+      {/* Fullscreen Active Floating Indicator & Exit Pill */}
+      {isFullscreen && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1002] bg-slate-900/90 backdrop-blur-md text-white px-4 py-2 rounded-full shadow-2xl flex items-center gap-3 border border-slate-700 pointer-events-auto animate-in fade-in slide-in-from-top-3">
+          <span className="text-xs font-bold flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            Mappa Schermo Intero · Follonica (58022)
+          </span>
+          <button
+            onClick={toggleFullscreen}
+            className="px-2.5 py-1 rounded-full bg-white/20 hover:bg-white/30 text-[11px] font-bold transition-colors cursor-pointer flex items-center gap-1"
+          >
+            <Minimize2 className="w-3 h-3" />
+            <span>Esci (Esc)</span>
+          </button>
+        </div>
+      )}
+
       {/* Top Floating Map Controls Container */}
-      <div className="absolute top-3 left-3 right-3 z-[1000] flex flex-col gap-2 pointer-events-none">
+      <div className={`absolute top-3 left-3 right-3 ${isFullscreen ? 'z-[1000] pt-12 sm:pt-0' : 'z-20'} flex flex-col gap-2 pointer-events-none`}>
         {/* Row 1: Search Bar & Tool Actions */}
         <div className="flex flex-wrap items-center justify-between gap-2 pointer-events-auto">
           {/* Search Bar on Map */}
@@ -632,6 +680,19 @@ export default function InteractiveMap({
 
           {/* Action Controls */}
           <div className="flex items-center gap-1.5 shrink-0">
+            {/* Fullscreen Expand/Collapse Button */}
+            <button
+              onClick={toggleFullscreen}
+              className={`p-2 rounded-xl backdrop-blur-md shadow-md border text-xs font-bold transition-all cursor-pointer ${
+                isFullscreen
+                  ? 'bg-follo-red text-white border-follo-red'
+                  : 'bg-white/95 text-slate-700 border-slate-200 hover:bg-slate-50 hover:text-follo-blue'
+              }`}
+              title={isFullscreen ? "Esci da Schermo Intero (Esc)" : "Espandi Mappa a Schermo Intero"}
+            >
+              {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+            </button>
+
             {/* "Aperto Ora" Live Filter Toggle on Map */}
             <button
               onClick={() => setIsOpenNowOnly(!isOpenNowOnly)}
@@ -683,7 +744,7 @@ export default function InteractiveMap({
               </button>
 
               {isLayersMenuOpen && (
-                <div className="absolute right-0 top-full mt-1.5 bg-white rounded-xl shadow-xl border border-slate-200 p-1.5 w-48 z-50 space-y-1 text-xs font-semibold">
+                <div className="absolute right-0 top-full mt-1.5 bg-white rounded-xl shadow-xl border border-slate-200 p-1.5 w-48 z-30 space-y-1 text-xs font-semibold">
                   <button
                     onClick={() => {
                       setTileLayerType('standard');
@@ -831,92 +892,114 @@ export default function InteractiveMap({
       </div>
 
       {/* Leaflet Map DOM Element Container */}
-      <div ref={mapContainerRef} className="w-full flex-1 min-h-[550px] z-0" />
+      <div ref={mapContainerRef} className="w-full flex-1 h-full min-h-[420px] z-0" />
 
-      {/* Floating Info & Category Legend Bar */}
-      <div className="absolute bottom-4 left-4 bg-white/95 backdrop-blur-md px-4 py-3 rounded-2xl shadow-lg border border-slate-200/90 z-[1000] text-xs space-y-2 pointer-events-auto max-w-sm">
-        <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-2">
-          <div className="flex items-center gap-1.5">
-            <MapPin className="w-4 h-4 text-follo-red" />
-            <span className="text-[11px] font-black uppercase text-slate-800 tracking-wider">
-              {selectedMapCat !== 'ALL'
-                ? `${MAP_CATEGORIES.find(c => c.id === selectedMapCat)?.label} (${visiblePlaces.length}/${places.length})`
-                : `Follonica (${visiblePlaces.length} Locali)`}
-            </span>
-          </div>
-          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-            OpenStreetMap Free HD
-          </span>
-        </div>
-
-        {accreditedCount > 0 ? (
-          <div className="space-y-1">
-            <div className="flex items-center gap-2 text-[11px]">
-              <span className="w-3 h-3 rounded-full bg-follo-blue border border-white shadow-xs shrink-0"></span>
-              <span className="font-bold text-slate-900">{accreditedCount} Partner Accreditati (Ordini Online)</span>
+      {/* Floating Info & Category Legend Bar (Collapsible to prevent overlapping) */}
+      <div className="absolute bottom-3 left-3 sm:bottom-4 sm:left-4 z-[20] pointer-events-auto max-w-[calc(100%-1.5rem)] sm:max-w-sm">
+        {isLegendOpen ? (
+          <div className="bg-white/95 backdrop-blur-md px-4 py-3 rounded-2xl shadow-xl border border-slate-200/90 text-xs space-y-2 animate-in fade-in slide-in-from-bottom-2">
+            <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-2">
+              <div className="flex items-center gap-1.5">
+                <MapPin className="w-4 h-4 text-follo-red" />
+                <span className="text-[11px] font-black uppercase text-slate-800 tracking-wider">
+                  {selectedMapCat !== 'ALL'
+                    ? `${MAP_CATEGORIES.find(c => c.id === selectedMapCat)?.label} (${visiblePlaces.length}/${places.length})`
+                    : `Follonica (${visiblePlaces.length} Locali)`}
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                  HD
+                </span>
+                <button
+                  onClick={() => setIsLegendOpen(false)}
+                  className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                  title="Comprimi legenda per vedere tutta la mappa"
+                >
+                  <ChevronDown className="w-4 h-4" />
+                </button>
+              </div>
             </div>
-            <div className="flex items-center gap-2 text-[11px]">
-              <span className="w-3 h-3 rounded-full bg-slate-500 border border-white shadow-xs shrink-0"></span>
-              <span className="text-slate-600">Attività in Directory (Chiamata)</span>
+
+            {accreditedCount > 0 ? (
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 text-[11px]">
+                  <span className="w-3 h-3 rounded-full bg-follo-blue border border-white shadow-xs shrink-0"></span>
+                  <span className="font-bold text-slate-900">{accreditedCount} Partner Accreditati (Ordini Online)</span>
+                </div>
+                <div className="flex items-center gap-2 text-[11px]">
+                  <span className="w-3 h-3 rounded-full bg-slate-500 border border-white shadow-xs shrink-0"></span>
+                  <span className="text-slate-600">Attività in Directory (Chiamata)</span>
+                </div>
+              </div>
+            ) : (
+              <p className="text-[11px] text-slate-600 leading-snug">
+                Censimento georeferenziato reale di Follonica: 100+ ristoranti, pizzerie, chalet e bar su terraferma con coordinate GPS esatte. Puoi accreditare qualsiasi locale dalla console <strong>SuperAdmin</strong> (/admin).
+              </p>
+            )}
+
+            {/* Interactive Category Filter Strip at Bottom */}
+            <div className="pt-2 flex items-center justify-between gap-1 text-[11px] border-t border-slate-100 font-medium overflow-x-auto scrollbar-none">
+              <button
+                onClick={() => setSelectedMapCat('PIZZA')}
+                className={`px-1.5 py-0.5 rounded-md font-bold transition-colors cursor-pointer ${
+                  selectedMapCat === 'PIZZA' ? 'bg-orange-100 text-orange-800 ring-1 ring-orange-300' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                🍕 Pizze
+              </button>
+              <button
+                onClick={() => setSelectedMapCat('PESCE')}
+                className={`px-1.5 py-0.5 rounded-md font-bold transition-colors cursor-pointer ${
+                  selectedMapCat === 'PESCE' ? 'bg-sky-100 text-sky-800 ring-1 ring-sky-300' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                🐟 Mare
+              </button>
+              <button
+                onClick={() => setSelectedMapCat('BURGER')}
+                className={`px-1.5 py-0.5 rounded-md font-bold transition-colors cursor-pointer ${
+                  selectedMapCat === 'BURGER' ? 'bg-amber-100 text-amber-800 ring-1 ring-amber-300' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                🍔 Burger
+              </button>
+              <button
+                onClick={() => setSelectedMapCat('SCHIACCIATA')}
+                className={`px-1.5 py-0.5 rounded-md font-bold transition-colors cursor-pointer ${
+                  selectedMapCat === 'SCHIACCIATA' ? 'bg-emerald-100 text-emerald-800 ring-1 ring-emerald-300' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                🥪 Pineta
+              </button>
+              <button
+                onClick={() => setSelectedMapCat('GELATO')}
+                className={`px-1.5 py-0.5 rounded-md font-bold transition-colors cursor-pointer ${
+                  selectedMapCat === 'GELATO' ? 'bg-pink-100 text-pink-800 ring-1 ring-pink-300' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                🍨 Gelati
+              </button>
+              <button
+                onClick={() => setSelectedMapCat('TRATTORIA')}
+                className={`px-1.5 py-0.5 rounded-md font-bold transition-colors cursor-pointer ${
+                  selectedMapCat === 'TRATTORIA' ? 'bg-amber-100 text-amber-800 ring-1 ring-amber-300' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                🥘 Trattorie
+              </button>
             </div>
           </div>
         ) : (
-          <p className="text-[11px] text-slate-600 leading-snug">
-            Censimento georeferenziato reale di Follonica: 100+ ristoranti, pizzerie, chalet e bar su terraferma con coordinate GPS esatte. Puoi accreditare qualsiasi locale dalla console <strong>SuperAdmin</strong> (/admin).
-          </p>
+          <button
+            onClick={() => setIsLegendOpen(true)}
+            className="flex items-center gap-2 px-3.5 py-2 bg-white/95 backdrop-blur-md hover:bg-white text-slate-800 rounded-2xl shadow-lg border border-slate-200/90 text-xs font-bold transition-all cursor-pointer hover:shadow-xl hover:border-follo-blue"
+          >
+            <MapPin className="w-3.5 h-3.5 text-follo-red shrink-0" />
+            <span>Legenda & Categorie ({visiblePlaces.length})</span>
+            <ChevronUp className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+          </button>
         )}
-
-        {/* Interactive Category Filter Strip at Bottom */}
-        <div className="pt-2 flex items-center justify-between gap-1 text-[11px] border-t border-slate-100 font-medium overflow-x-auto scrollbar-none">
-          <button
-            onClick={() => setSelectedMapCat('PIZZA')}
-            className={`px-1.5 py-0.5 rounded-md font-bold transition-colors cursor-pointer ${
-              selectedMapCat === 'PIZZA' ? 'bg-orange-100 text-orange-800 ring-1 ring-orange-300' : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            🍕 Pizze
-          </button>
-          <button
-            onClick={() => setSelectedMapCat('PESCE')}
-            className={`px-1.5 py-0.5 rounded-md font-bold transition-colors cursor-pointer ${
-              selectedMapCat === 'PESCE' ? 'bg-sky-100 text-sky-800 ring-1 ring-sky-300' : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            🐟 Mare
-          </button>
-          <button
-            onClick={() => setSelectedMapCat('BURGER')}
-            className={`px-1.5 py-0.5 rounded-md font-bold transition-colors cursor-pointer ${
-              selectedMapCat === 'BURGER' ? 'bg-amber-100 text-amber-800 ring-1 ring-amber-300' : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            🍔 Burger
-          </button>
-          <button
-            onClick={() => setSelectedMapCat('SCHIACCIATA')}
-            className={`px-1.5 py-0.5 rounded-md font-bold transition-colors cursor-pointer ${
-              selectedMapCat === 'SCHIACCIATA' ? 'bg-emerald-100 text-emerald-800 ring-1 ring-emerald-300' : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            🥪 Pineta
-          </button>
-          <button
-            onClick={() => setSelectedMapCat('GELATO')}
-            className={`px-1.5 py-0.5 rounded-md font-bold transition-colors cursor-pointer ${
-              selectedMapCat === 'GELATO' ? 'bg-pink-100 text-pink-800 ring-1 ring-pink-300' : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            🍨 Gelati
-          </button>
-          <button
-            onClick={() => setSelectedMapCat('TRATTORIA')}
-            className={`px-1.5 py-0.5 rounded-md font-bold transition-colors cursor-pointer ${
-              selectedMapCat === 'TRATTORIA' ? 'bg-amber-100 text-amber-800 ring-1 ring-amber-300' : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            🥘 Trattorie
-          </button>
-        </div>
       </div>
     </div>
   );

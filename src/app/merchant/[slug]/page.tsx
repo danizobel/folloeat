@@ -1,7 +1,5 @@
 'use client';
 
-export const runtime = 'edge';
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -428,6 +426,41 @@ export default function MerchantTerminalPage() {
               </p>
             )}
           </div>
+
+          {/* Orari, Giorno di Riposo & Chiusura Ferie (Master Spec v4.1 Section 4) */}
+          <div className="p-5 rounded-3xl bg-slate-900 border border-slate-800 space-y-3">
+            <div className="flex items-center gap-2 text-follo-blue font-bold text-xs uppercase tracking-wider">
+              <Clock className="w-4 h-4 text-follo-blue" />
+              <span>Chiusura & Riposo Settimanale</span>
+            </div>
+
+            <div className="text-xs space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">Giorno di Riposo:</span>
+                <span className="font-bold text-white bg-slate-800 px-2 py-0.5 rounded-lg border border-slate-700">
+                  {merchant?.weekly_off_day === 0 ? 'Domenica' :
+                   merchant?.weekly_off_day === 1 ? 'Lunedì' :
+                   merchant?.weekly_off_day === 2 ? 'Martedì' :
+                   merchant?.weekly_off_day === 3 ? 'Mercoledì' :
+                   merchant?.weekly_off_day === 4 ? 'Giovedì' :
+                   merchant?.weekly_off_day === 5 ? 'Venerdì' :
+                   merchant?.weekly_off_day === 6 ? 'Sabato' : 'Sempre Aperto'}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">Stato Ferie / Stagionale:</span>
+                <span className="font-bold text-emerald-400 flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                  In Attività
+                </span>
+              </div>
+
+              <p className="text-[10px] text-slate-500 leading-tight pt-1 border-t border-slate-800">
+                Blocco automatico carrello attivo durante il giorno di riposo per evitare ordini non evadibili.
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* Right 3 Columns: Real-Time Order Stream */}
@@ -465,6 +498,10 @@ export default function MerchantTerminalPage() {
                   }
 
                   const hasAlcohol = items.some(i => i.is_alcohol);
+                  const orderDate = new Date(order.created_at).getTime();
+                  const elapsedSeconds = Math.max(0, Math.floor((Date.now() - orderDate) / 1000));
+                  const remainingSeconds = Math.max(0, 180 - elapsedSeconds);
+                  const isEmergencyTriggered = elapsedSeconds >= 180;
 
                   return (
                     <div
@@ -480,6 +517,29 @@ export default function MerchantTerminalPage() {
                           IN ATTESA
                         </span>
                       </div>
+
+                      {/* 3-Minute Emergency SMS Countdown (Master Spec v4.1 Section 4) */}
+                      {isEmergencyTriggered ? (
+                        <div className="p-2.5 rounded-xl bg-amber-950/80 border border-amber-500/80 text-amber-200 text-xs flex items-start gap-2 animate-pulse">
+                          <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                          <div>
+                            <strong className="text-amber-300 block font-bold">⚠️ Fallback SMS Emergenza Attivato!</strong>
+                            <span className="text-[11px] text-amber-200/90 leading-tight">
+                              Superato il timeout di 3 minuti. SMS transazionale di backup inoltrato a <strong>{merchant?.emergency_phone || merchant?.phone}</strong>. Accetta ora per arrestare l&apos;allarme.
+                            </span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="p-2 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between text-[11px]">
+                          <span className="text-slate-400 flex items-center gap-1.5">
+                            <Clock className="w-3.5 h-3.5 text-follo-sand" />
+                            <span>Timeout accettazione a video:</span>
+                          </span>
+                          <span className="font-mono font-bold text-amber-400">
+                            {Math.floor(remainingSeconds / 60)}:{(remainingSeconds % 60).toString().padStart(2, '0')} min
+                          </span>
+                        </div>
+                      )}
 
                       {/* Customer Info */}
                       <div className="space-y-1 text-xs text-slate-300">

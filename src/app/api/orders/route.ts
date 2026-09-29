@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-export const runtime = 'edge';
-
 import { createOrder, getOrders } from '@/lib/db';
 import { OrderItem } from '@/lib/types';
 import { validateFollonicaAddress } from '@/lib/address-validation';

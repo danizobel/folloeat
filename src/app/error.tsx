@@ -1,7 +1,5 @@
 'use client';
 
-export const runtime = 'edge';
-
 import React, { useEffect } from 'react';
 import Link from 'next/link';
 import { RefreshCw, Home } from 'lucide-react';

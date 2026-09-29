@@ -1,7 +1,5 @@
 'use client';
 
-export const runtime = 'edge';
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
@@ -33,6 +31,7 @@ export default function OrderTrackingPage() {
 
   // Review state
   const [rating, setRating] = useState(5);
+  const [selectedTags, setSelectedTags] = useState<string[]>(['Cibo caldissimo', 'Puntualità perfetta']);
   const [reviewComment, setReviewComment] = useState('');
   const [reviewSubmitted, setReviewSubmitted] = useState(false);
   const previousStatusRef = useRef<string>('');
@@ -90,7 +89,11 @@ export default function OrderTrackingPage() {
 🔗 Segui l'avanzamento in tempo reale qui: ${trackingUrl}`;
 
     const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
-    window.open(url, '_blank');
+    const link = document.createElement('a');
+    link.href = url;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.click();
   };
 
   useEffect(() => {
@@ -129,9 +132,25 @@ export default function OrderTrackingPage() {
   const currentStep = order ? getStepIndex(order.status) : 0;
   const isCancelled = order?.status === 'CANCELLED';
 
+  const handleToggleTag = (tag: string) => {
+    setSelectedTags(prev =>
+      prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
+    );
+  };
+
   const handleSendReview = (e: React.FormEvent) => {
     e.preventDefault();
     setReviewSubmitted(true);
+    try {
+      if (typeof window !== 'undefined') {
+        const savedUser = localStorage.getItem('folloeat_user_session');
+        if (savedUser) {
+          const userObj = JSON.parse(savedUser);
+          userObj.follo_points = (userObj.follo_points || 0) + 10;
+          localStorage.setItem('folloeat_user_session', JSON.stringify(userObj));
+        }
+      }
+    } catch {}
   };
 
   return (
@@ -406,14 +425,23 @@ export default function OrderTrackingPage() {
                   </div>
 
                   <div className="flex flex-wrap gap-1.5 text-[11px]">
-                    {['Cibo caldissimo', 'Puntualità perfetta', 'Servizio al tavolo', 'Gusto maremmano', 'Rider cortese'].map(b => (
-                      <span
-                        key={b}
-                        className="px-2.5 py-1 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium cursor-pointer border border-slate-200 transition-colors"
-                      >
-                        {b}
-                      </span>
-                    ))}
+                    {['Cibo caldissimo', 'Puntualità perfetta', 'Servizio al tavolo', 'Gusto maremmano', 'Rider cortese'].map(b => {
+                      const isSelected = selectedTags.includes(b);
+                      return (
+                        <button
+                          type="button"
+                          key={b}
+                          onClick={() => handleToggleTag(b)}
+                          className={`px-2.5 py-1 rounded-full text-xs font-semibold cursor-pointer border transition-all ${
+                            isSelected
+                              ? 'bg-amber-100 text-amber-900 border-amber-300 font-bold ring-1 ring-amber-300'
+                              : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
+                          }`}
+                        >
+                          {isSelected ? '✓ ' : ''}{b}
+                        </button>
+                      );
+                    })}
                   </div>
 
                   <textarea

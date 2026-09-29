@@ -1,11 +1,13 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
 
-export const runtime = 'edge';
-
 export const metadata: Metadata = {
-  title: 'folloeat. | Food Delivery, Asporto, Spiaggia & Tavoli a Follonica',
-  description: 'Piattaforma etica iperlocale per Follonica e il litorale maremmano. Ordini diretti ai ristoratori locali, consegna all\'ombrellone e prenotazione Radar Tavoli.',
+  title: 'FolloEat | Piattaforma etica iperlocale per Follonica e il litorale maremmano',
+  description: 'Piattaforma etica iperlocale per Follonica e il litorale maremmano. Food delivery, asporto e prenotazione rapida tavoli con terminale Sunmi e incassi diretti ai ristoratori.',
+  openGraph: {
+    title: 'FolloEat | Piattaforma etica iperlocale per Follonica e il litorale maremmano',
+    description: 'Piattaforma etica iperlocale per Follonica e il litorale maremmano. Food delivery, asporto e prenotazione rapida tavoli con terminale Sunmi e incassi diretti ai ristoratori.',
+  },
   applicationName: 'folloeat.',
   appleWebApp: {
     capable: true,
